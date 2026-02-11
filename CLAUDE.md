@@ -58,6 +58,20 @@ templates/              — Embedded scaffold templates for ralph init (//go:emb
 - **stream-json format** — Claude's `--output-format=stream-json` produces JSONL; we parse line-by-line with bufio.Scanner + json.Unmarshal
 - **Embedded templates** — scaffold files use Go's `text/template` + `//go:embed`
 
+## Commit Convention
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
+
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation only
+- `chore:` build, CI, tooling
+- `refactor:` code change that neither fixes a bug nor adds a feature
+- `test:` adding or updating tests
+
+Use scope when relevant: `feat(stream): add color support`
+Single line only. No body, no `Co-Authored-By` trailer.
+
 ## Conventions
 
 - Keep packages focused — one responsibility per package
