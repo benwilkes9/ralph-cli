@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: golangci-lint run --fix ./...
+      stage_fixed: true
+      fail_text: "Lint failed. Run 'golangci-lint run --fix ./...' to fix."
+    test:
+      run: make test
+      fail_text: "Tests failed."
+    gitleaks:
+      run: gitleaks protect --staged
+      fail_text: "Secrets detected! Remove them before committing."
+      env:
+        PATH: "{root}/node_modules/.bin:/usr/local/bin:/opt/homebrew/bin:$GOPATH/bin:$HOME/go/bin:$PATH"

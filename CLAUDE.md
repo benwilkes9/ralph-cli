@@ -1,0 +1,71 @@
+# CLAUDE.md
+
+## Project
+
+Ralph CLI — a Go CLI that orchestrates autonomous plan/build iteration loops using Claude Code. Replaces a bash-based workflow with a single binary.
+
+## Commands
+
+```bash
+ralph init    # Scaffold .ralph/ in current repo
+ralph plan    # Run planning loop (generates IMPLEMENTATION_PLAN.md)
+ralph apply   # Run build loop (implements tasks one at a time)
+ralph status  # Progress summary — tasks done, costs, pass/fail
+```
+
+## Build & Test
+
+```bash
+make build    # Build to bin/ralph
+make install  # Install to $GOPATH/bin
+make test     # go test -race ./...
+make lint     # golangci-lint run ./...
+```
+
+## Pre-commit Hooks
+
+Run before committing (managed by lefthook):
+
+```bash
+go tool lefthook run pre-commit
+```
+
+This runs in parallel:
+- `golangci-lint run --fix ./...` — lint + auto-fix
+- `make test` — all tests
+- `gitleaks protect --staged` — secret detection
+
+Always run this before committing code.
+
+## Architecture
+
+```
+cmd/ralph/main.go       — Cobra CLI entrypoint, all subcommands defined here
+internal/config/        — .ralph/config.yaml parsing + defaults
+internal/stream/        — JSONL stream parser, ANSI formatter, stats tracking
+internal/loop/          — Iteration loop orchestrator, stale detection
+internal/git/           — Git operations (shelling out to git CLI)
+internal/log/           — JSONL log file tee writer
+internal/docker/        — Docker build + run (shelling out to docker CLI)
+internal/summary/       — Final summary box rendering
+templates/              — Embedded scaffold templates for ralph init (//go:embed)
+```
+
+## Key Decisions
+
+- **Shell out** to `git` and `docker` CLIs rather than using Go SDKs — simpler, fewer deps
+- **No Docker SDK** — `docker build` and `docker run` via exec.Command
+- **stream-json format** — Claude's `--output-format=stream-json` produces JSONL; we parse line-by-line with bufio.Scanner + json.Unmarshal
+- **Embedded templates** — scaffold files use Go's `text/template` + `//go:embed`
+
+## Conventions
+
+- Keep packages focused — one responsibility per package
+- Prefer returning errors over panicking
+- Use `fmt.Errorf("context: %w", err)` for error wrapping
+- Version injected via `-ldflags` at build time from git tags
+- Test files live alongside source: `foo_test.go` next to `foo.go`
+
+## Reference
+
+Initial implementation plan: `specs/ralph-cli-plan.md`

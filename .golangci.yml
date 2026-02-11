@@ -1,0 +1,77 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    # Bugs
+    - errcheck          # Unchecked errors
+    - bodyclose         # Unclosed HTTP response bodies
+    - nilerr            # Returns nil where error expected
+    - nilnil            # Avoids returning nil, nil
+    - copyloopvar       # Loop variable capture bugs
+    - ineffassign       # Unused assignments
+    - wastedassign      # Wasted assignments
+
+    # Security
+    - gosec             # Security problems
+
+    # Style & quality
+    - gocritic          # Opinionated best practices
+    - revive            # Extensible linter (replaces golint)
+    - unconvert         # Unnecessary type conversions
+    - unparam           # Unused function parameters
+    - misspell          # Spelling mistakes
+    - prealloc          # Suggests preallocating slices
+    - noctx             # HTTP requests without context
+    - errname           # Error variable naming (ErrFoo)
+    - errorlint         # Error wrapping issues
+    - exhaustive        # Missing switch cases for enums
+    - goconst           # Repeated strings that should be constants
+    - predeclared       # Shadowing predeclared identifiers
+    - usestdlibvars     # Use stdlib constants (http.StatusOK, etc.)
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: increment-decrement
+        - name: var-naming
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    gosec:
+      excludes:
+        - G104  # Duplicates errcheck
+        - G304  # File paths are constructed internally, not from user input
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
