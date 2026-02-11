@@ -30,6 +30,12 @@ func Push(branch string) error {
 	return err
 }
 
+// PushSetUpstream pushes and sets the upstream tracking branch.
+func PushSetUpstream(branch string) error {
+	_, err := run("push", "-u", "origin", branch)
+	return err
+}
+
 // PullRebase performs a pull --rebase on the given branch.
 func PullRebase(branch string) error {
 	_, err := run("pull", "--rebase", "origin", branch)

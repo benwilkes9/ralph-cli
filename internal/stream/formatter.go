@@ -18,18 +18,21 @@ const (
 
 // ANSI escape codes
 const (
-	Reset     = "\033[0m"
-	Bold      = "\033[1m"
-	Dim       = "\033[2m"
-	White     = "\033[37m"
-	Green     = "\033[32m"
-	Red       = "\033[31m"
-	Yellow    = "\033[33m"
-	Cyan      = "\033[36m"
-	Magenta   = "\033[35m"
-	BoldCyan  = "\033[1;36m"
-	BoldRed   = "\033[1;31m"
-	BoldWhite = "\033[1;37m"
+	Reset      = "\033[0m"
+	Bold       = "\033[1m"
+	Dim        = "\033[2m"
+	White      = "\033[37m"
+	Green      = "\033[32m"
+	Red        = "\033[31m"
+	Yellow     = "\033[33m"
+	Cyan       = "\033[36m"
+	Magenta    = "\033[35m"
+	BoldCyan   = "\033[1;36m"
+	BoldRed    = "\033[1;31m"
+	BoldWhite  = "\033[1;37m"
+	BoldGreen  = "\033[1;32m"
+	BoldYellow = "\033[1;33m"
+	BoldBlue   = "\033[1;34m"
 )
 
 // FormatTokens formats a token count for display (e.g. "45.3k", "1.5M").
