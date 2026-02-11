@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -14,6 +15,7 @@ import (
 	"github.com/benmyles/ralph-cli/internal/git"
 	"github.com/benmyles/ralph-cli/internal/loop"
 	"github.com/benmyles/ralph-cli/internal/scaffold"
+	"github.com/benmyles/ralph-cli/internal/state"
 	"github.com/benmyles/ralph-cli/internal/status"
 )
 
@@ -143,7 +145,12 @@ func statusCmd() *cobra.Command {
 				return fmt.Errorf("parsing logs: %w", err)
 			}
 
-			status.Render(os.Stdout, cfg.Project, branch, tasks, runs)
+			st, err := state.Load(filepath.Join(repoRoot, state.DefaultPath))
+			if err != nil {
+				return fmt.Errorf("loading state: %w", err)
+			}
+
+			status.Render(os.Stdout, cfg.Project, branch, tasks, runs, st.LastRun())
 			return nil
 		},
 	}
@@ -220,6 +227,7 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 		FreshContext:  phase.FreshContext,
 		LogsDir:       "logs",
 		Branch:        branch,
+		StateFile:     state.DefaultPath,
 	}
 
 	loopErr := loop.Run(ctx, opts, os.Stdout)

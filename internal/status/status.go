@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/benmyles/ralph-cli/internal/state"
 	"github.com/benmyles/ralph-cli/internal/stream"
 )
 
@@ -131,7 +132,7 @@ func extractCost(path string) (float64, error) {
 // Render writes a formatted status summary to w.
 //
 //nolint:errcheck // display output, best-effort writes
-func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo) {
+func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo, lastRun *state.RunRecord) {
 	fmt.Fprintf(w, "Project: %s\n", project)
 	fmt.Fprintf(w, "Branch:  %s\n", branch)
 
@@ -156,13 +157,19 @@ func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo) {
 		}
 	}
 
-	if len(runs) > 0 {
+	if lastRun != nil {
+		fmt.Fprintf(w, "\nLast run:   %s (%s, %d iterations)\n",
+			lastRun.StartedAt.Format("2006-01-02 15:04"), lastRun.Mode, lastRun.Iterations)
+	} else if len(runs) > 0 {
 		last := runs[len(runs)-1]
+		fmt.Fprintf(w, "\nLast run:   %s\n", last.Time.Format("2006-01-02 15:04"))
+	}
+
+	if len(runs) > 0 {
 		var totalCost float64
 		for _, r := range runs {
 			totalCost += r.Cost
 		}
-		fmt.Fprintf(w, "\nLast run:   %s\n", last.Time.Format("2006-01-02 15:04"))
 		fmt.Fprintf(w, "Total cost: $%.4f across %d iterations\n", totalCost, len(runs))
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/benmyles/ralph-cli/internal/state"
 )
 
 const samplePlan = `# Implementation Plan
@@ -136,9 +138,14 @@ func TestRender(t *testing.T) {
 		{Time: time.Date(2026, 2, 10, 14, 0, 0, 0, time.UTC), Cost: 1.2345},
 		{Time: time.Date(2026, 2, 11, 14, 30, 0, 0, time.UTC), Cost: 2.2222},
 	}
+	lastRun := &state.RunRecord{
+		Mode:       "build",
+		StartedAt:  time.Date(2026, 2, 11, 14, 30, 0, 0, time.UTC),
+		Iterations: 5,
+	}
 
 	var buf bytes.Buffer
-	Render(&buf, "my-api", "feature/auth", tasks, runs)
+	Render(&buf, "my-api", "feature/auth", tasks, runs, lastRun)
 	out := buf.String()
 
 	expects := []string{
@@ -149,7 +156,7 @@ func TestRender(t *testing.T) {
 		"Database layer",
 		"Delete todo endpoint",
 		"List filtering and search",
-		"Last run:   2026-02-11 14:30",
+		"Last run:   2026-02-11 14:30 (build, 5 iterations)",
 		"Total cost: $3.4567 across 2 iterations",
 	}
 	for _, s := range expects {
@@ -161,7 +168,7 @@ func TestRender(t *testing.T) {
 
 func TestRenderEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	Render(&buf, "my-api", "main", nil, nil)
+	Render(&buf, "my-api", "main", nil, nil, nil)
 	out := buf.String()
 
 	if !strings.Contains(out, "Project: my-api") {
