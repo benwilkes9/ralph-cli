@@ -1,6 +1,72 @@
 # Ralph CLI
 
-A CLI implementation of the Ralph Wiggam loop, made famous in the [Geoff Huntley Blog](https://ghuntley.com/ralph). Also based on the [Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook)
+A Go CLI that orchestrates autonomous plan/build iteration loops using [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Replaces a bash-based workflow with a single binary.
+
+Based on the [Ralph Wiggam loop](https://ghuntley.com/ralph) and the [Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook).
+
+## Installation
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install benmyles/tap/ralph
+```
+
+### Curl script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/benmyles/ralph-cli/main/install.sh | sh
+```
+
+### Go install
+
+```bash
+go install github.com/benmyles/ralph-cli/cmd/ralph@latest
+```
+
+## Quick Start
+
+```bash
+# 1. Scaffold .ralph/ in your repo
+ralph init
+
+# 2. Add your API keys
+cp .env.example .env
+$EDITOR .env
+
+# 3. Run planning loop (generates .ralph/IMPLEMENTATION_PLAN.md)
+ralph plan
+
+# 4. Run build loop (implements tasks one at a time)
+ralph apply
+
+# 5. Check progress
+ralph status
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `ralph init` | Scaffold `.ralph/` in current repo |
+| `ralph plan` | Run planning loop (generates implementation plan) |
+| `ralph apply` | Run build loop (implements tasks one at a time) |
+| `ralph status` | Progress summary — tasks done, costs, pass/fail |
+
+### Flags
+
+- `ralph plan -n 3` — limit planning to 3 iterations
+- `ralph apply -n 10` — limit build to 10 iterations
+
+## Configuration
+
+After `ralph init`, edit `.ralph/config.yaml` to configure:
+
+- Project name and agent
+- Backpressure commands (test, typecheck, lint)
+- Phase-specific settings (prompt files, max iterations)
+
+See `ralph init` output for file locations.
 
 ## Development
 
@@ -29,3 +95,6 @@ make lint     # Run linter
 make install  # Install to $GOPATH/bin
 ```
 
+## License
+
+[MIT](LICENSE)
