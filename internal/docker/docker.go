@@ -8,7 +8,7 @@ import (
 	"github.com/benmyles/ralph-cli/internal/git"
 )
 
-var requiredEnvVars = []string{"ANTHROPIC_API_KEY"}
+var requiredEnvVars = []string{"ANTHROPIC_API_KEY", "GITHUB_PAT"}
 
 // BuildAndRun orchestrates the full Docker workflow: detect repo, load env,
 // validate, build image, run container, and sync changes back.
