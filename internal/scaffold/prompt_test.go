@@ -2,20 +2,37 @@ package scaffold
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
+
+// byteReader wraps a reader to deliver one byte at a time, preventing
+// bufio.Scanner from over-buffering when huh creates a new scanner per field.
+type byteReader struct {
+	r io.Reader
+}
+
+func (br *byteReader) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	return br.r.Read(p[:1])
+}
 
 func TestRunPrompts_AllDefaults(t *testing.T) {
 	info := &ProjectInfo{
 		RunCmd: "uv run uvicorn app:app",
 	}
-	input := "\n\n\n\n" // accept all defaults
+	// In accessible mode: 4 prompts, all accept defaults with empty lines.
+	// Confirm default is true, empty line → yes.
+	input := "\n\n\n\n"
 	out := &bytes.Buffer{}
 
 	err := RunPrompts(info, &PromptOptions{
-		In:  strings.NewReader(input),
-		Out: out,
+		In:         &byteReader{strings.NewReader(input)},
+		Out:        out,
+		Accessible: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -35,12 +52,17 @@ func TestRunPrompts_CustomValues(t *testing.T) {
 	info := &ProjectInfo{
 		RunCmd: "npm start",
 	}
+	// Input 1: override run command
+	// Input 2: set goal
+	// Confirm: "n" to decline specs
+	// Input 3: env vars
 	input := "go run ./cmd/server\nBuild a REST API\nn\nDATABASE_URL, REDIS_URL\n"
 	out := &bytes.Buffer{}
 
 	err := RunPrompts(info, &PromptOptions{
-		In:  strings.NewReader(input),
-		Out: out,
+		In:         &byteReader{strings.NewReader(input)},
+		Out:        out,
+		Accessible: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -64,8 +86,9 @@ func TestRunPrompts_OutputContainsPrompts(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	if err := RunPrompts(info, &PromptOptions{
-		In:  strings.NewReader(input),
-		Out: out,
+		In:         &byteReader{strings.NewReader(input)},
+		Out:        out,
+		Accessible: true,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -87,12 +110,14 @@ func TestRunPrompts_OutputContainsPrompts(t *testing.T) {
 
 func TestRunPrompts_YesNoExplicitYes(t *testing.T) {
 	info := &ProjectInfo{}
+	// Empty for inputs, "y" for confirm, empty for env vars
 	input := "\n\ny\n\n"
 	out := &bytes.Buffer{}
 
 	if err := RunPrompts(info, &PromptOptions{
-		In:  strings.NewReader(input),
-		Out: out,
+		In:         &byteReader{strings.NewReader(input)},
+		Out:        out,
+		Accessible: true,
 	}); err != nil {
 		t.Fatal(err)
 	}

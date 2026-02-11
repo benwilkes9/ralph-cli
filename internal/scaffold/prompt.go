@@ -1,35 +1,56 @@
 package scaffold
 
 import (
-	"bufio"
-	"fmt"
 	"io"
 	"strings"
+
+	"github.com/charmbracelet/huh"
 )
 
 // PromptOptions configures input/output for interactive prompts.
 type PromptOptions struct {
-	In  io.Reader
-	Out io.Writer
+	In         io.Reader
+	Out        io.Writer
+	Accessible bool
 }
 
 // RunPrompts asks the user to confirm or override detected values.
 func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
-	scanner := bufio.NewScanner(opts.In)
+	var envVars string
+	info.CreateSpecs = true // default to creating specs dir
 
-	info.RunCmd = promptWithDefault(scanner, opts.Out,
-		"Run command (how to start the app)", info.RunCmd)
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Run command (how to start the app)").
+				Value(&info.RunCmd),
+			huh.NewInput().
+				Title("Project goal (one sentence)").
+				Value(&info.Goal),
+			huh.NewConfirm().
+				Title("Create .ralph/specs/ directory?").
+				Affirmative("Yes").
+				Negative("No").
+				Value(&info.CreateSpecs),
+			huh.NewInput().
+				Title("Additional env vars (comma-separated, e.g. DATABASE_URL,REDIS_URL)").
+				Value(&envVars),
+		),
+	).WithAccessible(opts.Accessible)
 
-	info.Goal = promptWithDefault(scanner, opts.Out,
-		"Project goal (one sentence)", info.Goal)
+	if opts.In != nil {
+		form = form.WithInput(opts.In)
+	}
+	if opts.Out != nil {
+		form = form.WithOutput(opts.Out)
+	}
 
-	info.CreateSpecs = promptYesNo(scanner, opts.Out,
-		"Create .ralph/specs/ directory?", true)
+	if err := form.Run(); err != nil {
+		return err //nolint:wrapcheck // propagate huh errors directly
+	}
 
-	extra := promptWithDefault(scanner, opts.Out,
-		"Additional env vars (comma-separated, e.g. DATABASE_URL,REDIS_URL)", "")
-	if extra != "" {
-		for _, v := range strings.Split(extra, ",") {
+	if envVars != "" {
+		for _, v := range strings.Split(envVars, ",") {
 			v = strings.TrimSpace(v)
 			if v != "" {
 				info.EnvVars = append(info.EnvVars, v)
@@ -38,39 +59,4 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 	}
 
 	return nil
-}
-
-//nolint:errcheck // display-only writes to terminal
-func promptWithDefault(scanner *bufio.Scanner, w io.Writer, prompt, defaultVal string) string {
-	if defaultVal != "" {
-		fmt.Fprintf(w, "%s [%s]: ", prompt, defaultVal)
-	} else {
-		fmt.Fprintf(w, "%s: ", prompt)
-	}
-	if scanner.Scan() {
-		input := strings.TrimSpace(scanner.Text())
-		if input != "" {
-			return input
-		}
-	}
-	return defaultVal
-}
-
-//nolint:errcheck // display-only writes to terminal
-func promptYesNo(scanner *bufio.Scanner, w io.Writer, prompt string, defaultYes bool) bool {
-	hint := "Y/n"
-	if !defaultYes {
-		hint = "y/N"
-	}
-	fmt.Fprintf(w, "%s [%s]: ", prompt, hint)
-	if scanner.Scan() {
-		input := strings.TrimSpace(strings.ToLower(scanner.Text()))
-		switch input {
-		case "y", "yes":
-			return true
-		case "n", "no":
-			return false
-		}
-	}
-	return defaultYes
 }
