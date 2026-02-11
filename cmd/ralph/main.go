@@ -41,7 +41,7 @@ func initCmd() *cobra.Command {
 func planCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan",
-		Short: "Run planning loop (generates IMPLEMENTATION_PLAN.md)",
+		Short: "Run planning loop (generates .ralph/IMPLEMENTATION_PLAN.md)",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			fmt.Println("ralph plan: not yet implemented")
 			return nil

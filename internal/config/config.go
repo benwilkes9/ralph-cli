@@ -63,7 +63,7 @@ func (c *Config) applyDefaults() {
 		c.Phases.Plan.Prompt = ".ralph/prompts/plan.md"
 	}
 	if c.Phases.Plan.Output == "" {
-		c.Phases.Plan.Output = "IMPLEMENTATION_PLAN.md"
+		c.Phases.Plan.Output = ".ralph/IMPLEMENTATION_PLAN.md"
 	}
 	if c.Phases.Plan.MaxIterations == 0 {
 		c.Phases.Plan.MaxIterations = 5
