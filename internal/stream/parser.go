@@ -8,18 +8,18 @@ import (
 
 // Event represents a single JSONL event from Claude's stream-json output.
 type Event struct {
-	Type    string          `json:"type"`
-	Message json.RawMessage `json:"message,omitempty"`
+	Type          string         `json:"type"`
+	Message       *Message       `json:"message,omitempty"`
+	ToolUseResult *ToolUseResult `json:"tool_use_result,omitempty"`
+	TotalCostUSD  float64        `json:"total_cost_usd,omitempty"`
+}
 
-	// Top-level fields that vary by event type
-	Role         string         `json:"role,omitempty"`
-	Content      []ContentBlock `json:"content,omitempty"`
-	StopReason   string         `json:"stop_reason,omitempty"`
-	Result       *ResultData    `json:"result,omitempty"`
-	SubagentType string         `json:"subtype,omitempty"`
-
-	// Usage info (present on assistant events)
-	Usage *Usage `json:"usage,omitempty"`
+// Message represents a Claude message with role, content, and usage.
+type Message struct {
+	Model   string         `json:"model,omitempty"`
+	Role    string         `json:"role,omitempty"`
+	Content []ContentBlock `json:"content,omitempty"`
+	Usage   *Usage         `json:"usage,omitempty"`
 }
 
 // ContentBlock represents a content element within a Claude response.
@@ -31,9 +31,15 @@ type ContentBlock struct {
 	Input json.RawMessage `json:"input,omitempty"`
 }
 
-// ResultData contains cost information from a completed Claude session.
-type ResultData struct {
-	TotalCostUSD float64 `json:"total_cost_usd"`
+// ToolUseResult contains the result of a tool invocation.
+type ToolUseResult struct {
+	// Regular tool fields
+	Stdout string `json:"stdout,omitempty"`
+	// Subagent fields (discriminator: TotalTokens > 0)
+	Status            string `json:"status,omitempty"`
+	TotalTokens       int    `json:"totalTokens,omitempty"`
+	TotalDurationMs   int    `json:"totalDurationMs,omitempty"`
+	TotalToolUseCount int    `json:"totalToolUseCount,omitempty"`
 }
 
 // Usage tracks token consumption for a single Claude response.

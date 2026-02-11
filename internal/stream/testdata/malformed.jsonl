@@ -1,0 +1,5 @@
+not json at all
+{"type":"assistant","message":{"model":"claude-opus-4-6","id":"msg_valid","type":"message","role":"assistant","content":[{"type":"text","text":"valid line"}],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":100,"cache_creation_input_tokens":200,"cache_read_input_tokens":300,"output_tokens":50}},"parent_tool_use_id":null}
+
+{"truncated":true
+{"type":"user","message":{"role":"user","content":[]},"tool_use_result":{"stdout":"ok"}}
