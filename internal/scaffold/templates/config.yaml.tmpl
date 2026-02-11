@@ -1,0 +1,20 @@
+project: "{{.ProjectName}}"
+agent: claude
+
+backpressure:
+  test: "{{.TestCmd}}"
+{{- if .TypecheckCmd}}
+  typecheck: "{{.TypecheckCmd}}"
+{{- end}}
+{{- if .LintCmd}}
+  lint: "{{.LintCmd}}"
+{{- end}}
+
+phases:
+  plan:
+    prompt: .ralph/prompts/plan.md
+    output: .ralph/IMPLEMENTATION_PLAN.md
+    max_iterations: 5
+  build:
+    prompt: .ralph/prompts/build.md
+    max_iterations: 20

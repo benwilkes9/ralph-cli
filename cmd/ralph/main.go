@@ -13,6 +13,7 @@ import (
 	"github.com/benmyles/ralph-cli/internal/docker"
 	"github.com/benmyles/ralph-cli/internal/git"
 	"github.com/benmyles/ralph-cli/internal/loop"
+	"github.com/benmyles/ralph-cli/internal/scaffold"
 )
 
 var version = "dev"
@@ -41,7 +42,26 @@ func initCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Scaffold .ralph/ in current repo",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			fmt.Println("ralph init: not yet implemented")
+			repoRoot, err := git.RepoRoot()
+			if err != nil {
+				return fmt.Errorf("finding repo root: %w", err)
+			}
+
+			info := scaffold.Detect(repoRoot)
+
+			if err := scaffold.RunPrompts(info, &scaffold.PromptOptions{
+				In:  os.Stdin,
+				Out: os.Stdout,
+			}); err != nil {
+				return fmt.Errorf("running prompts: %w", err)
+			}
+
+			result, err := scaffold.Generate(repoRoot, info)
+			if err != nil {
+				return fmt.Errorf("generating scaffold: %w", err)
+			}
+
+			scaffold.PrintSummary(os.Stdout, result)
 			return nil
 		},
 	}

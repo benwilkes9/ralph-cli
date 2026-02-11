@@ -1,0 +1,14 @@
+.git
+logs
+node_modules
+{{- if eq (str .Language) "python"}}
+.venv
+.ruff_cache
+.pytest_cache
+__pycache__
+*.pyc
+{{- else if eq (str .Language) "go"}}
+vendor/
+{{- else if eq (str .Language) "rust"}}
+target/
+{{- end}}

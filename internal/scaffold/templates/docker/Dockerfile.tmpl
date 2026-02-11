@@ -1,0 +1,61 @@
+FROM {{.BaseImage}}
+
+# ═════════════════════════════════════════════════════════════════
+# Universal layers — same across all repos using this pattern
+# ═════════════════════════════════════════════════════════════════
+
+# System packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git jq bc curl ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code@latest
+
+# Ralph CLI (loop orchestrator)
+{{- if eq (str .Language) "go"}}
+COPY --from=golang:{{.LanguageVersion}}-bookworm /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
+RUN go install github.com/benmyles/ralph-cli/cmd/ralph@latest
+{{- else}}
+COPY --from=golang:1.25-bookworm /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
+RUN go install github.com/benmyles/ralph-cli/cmd/ralph@latest
+{{- end}}
+
+# ═════════════════════════════════════════════════════════════════
+# Language runtime layers
+# ═════════════════════════════════════════════════════════════════
+{{- if eq (str .Language) "python"}}
+
+# uv (Python package manager)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+{{- else if eq (str .Language) "rust"}}
+
+# Rust toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain {{.LanguageVersion}}
+ENV PATH="/root/.cargo/bin:$PATH"
+{{- end}}
+
+# Non-root user
+RUN useradd -m -s /bin/bash claude \
+    && mkdir -p /home/claude/.claude /workspace/repo \
+    && chown -R claude:claude /home/claude /workspace
+
+# ═════════════════════════════════════════════════════════════════
+# Project-specific layers
+# ═════════════════════════════════════════════════════════════════
+
+COPY .ralph/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+USER claude
+WORKDIR /workspace
+{{- if eq (str .Language) "python"}}
+ENV PATH="/home/claude/.local/bin:$PATH"
+RUN uv python install {{.LanguageVersion}}
+{{- else if eq (str .Language) "go"}}
+ENV PATH="/home/claude/go/bin:$PATH"
+{{- end}}
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

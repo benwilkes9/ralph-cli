@@ -1,0 +1,43 @@
+## Build & Run
+
+{{- if ne (str .PackageManager) "unknown"}}
+- Package manager: `{{.PackageManager}}`
+{{- end}}
+- Install deps: `{{.InstallCmd}}`
+{{- if .RunCmd}}
+- Run the app: `{{.RunCmd}}`
+{{- end}}
+- Source code: `{{.SourceDirsList}}`
+- Tests: `{{.TestDirsList}}`
+{{- if .CreateSpecs}}
+- Specs: `.ralph/specs/`
+{{- end}}
+
+## Validation
+
+Run these after implementing to get immediate feedback:
+
+- Tests: `{{.TestCmd}}`
+{{- if .TypecheckCmd}}
+- Typecheck: `{{.TypecheckCmd}}`
+{{- end}}
+{{- if .LintCmd}}
+- Lint: `{{.LintCmd}}`
+{{- end}}
+
+## Operational Notes
+
+{{- if eq (str .Language) "python"}}
+- Python {{.LanguageVersion}}, strict pyright, ruff already configured.
+{{- else if eq (str .Language) "go"}}
+- Go {{.LanguageVersion}}, golangci-lint configured.
+{{- else if eq (str .Language) "node"}}
+- Node {{.LanguageVersion}}, TypeScript strict mode.
+{{- else if eq (str .Language) "rust"}}
+- Rust {{.LanguageVersion}}, clippy configured.
+{{- end}}
+
+### Plan Conventions
+
+- Tasks in `IMPLEMENTATION_PLAN.md` use `[ ]` (incomplete) and `[x]` (complete).
+- A task is complete when all its required tests exist and pass. Update status as part of each iteration.
