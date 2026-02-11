@@ -1,0 +1,26 @@
+version: 2
+
+builds:
+  - main: ./cmd/ralph
+    binary: ralph
+    ldflags:
+      - -X main.version={{.Version}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format_overrides:
+      - goos: darwin
+        format: zip
+
+brews:
+  - repository:
+      owner: benmyles
+      name: homebrew-tap
+    name: ralph
+    homepage: https://github.com/benmyles/ralph-cli
+    description: Autonomous plan/build iteration using Claude Code

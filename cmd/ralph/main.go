@@ -14,6 +14,7 @@ import (
 	"github.com/benmyles/ralph-cli/internal/git"
 	"github.com/benmyles/ralph-cli/internal/loop"
 	"github.com/benmyles/ralph-cli/internal/scaffold"
+	"github.com/benmyles/ralph-cli/internal/status"
 )
 
 var version = "dev"
@@ -112,7 +113,37 @@ func statusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Progress summary — tasks done, costs, pass/fail",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			fmt.Println("ralph status: not yet implemented")
+			repoRoot, err := git.RepoRoot()
+			if err != nil {
+				return fmt.Errorf("finding repo root: %w", err)
+			}
+
+			cfg, err := config.Load(repoRoot)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+
+			branch, err := git.Branch()
+			if err != nil {
+				return fmt.Errorf("getting branch: %w", err)
+			}
+
+			planPath := cfg.Phases.Plan.Output
+			if planPath == "" {
+				planPath = ".ralph/IMPLEMENTATION_PLAN.md"
+			}
+
+			tasks, err := status.ParsePlan(planPath)
+			if err != nil {
+				return fmt.Errorf("parsing plan: %w", err)
+			}
+
+			runs, err := status.ParseLogs(".ralph/logs")
+			if err != nil {
+				return fmt.Errorf("parsing logs: %w", err)
+			}
+
+			status.Render(os.Stdout, cfg.Project, branch, tasks, runs)
 			return nil
 		},
 	}
