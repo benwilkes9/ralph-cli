@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
 	"github.com/benmyles/ralph-cli/internal/config"
+	"github.com/benmyles/ralph-cli/internal/docker"
 	"github.com/benmyles/ralph-cli/internal/git"
 	"github.com/benmyles/ralph-cli/internal/loop"
 )
@@ -26,6 +28,7 @@ func main() {
 	root.AddCommand(planCmd())
 	root.AddCommand(applyCmd())
 	root.AddCommand(statusCmd())
+	root.AddCommand(loopCmd())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -53,7 +56,11 @@ func planCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("reading --max flag: %w", err)
 			}
-			return runLoop(loop.ModePlan, maxVal)
+			branch, err := git.Branch()
+			if err != nil {
+				return fmt.Errorf("getting current branch: %w", err)
+			}
+			return docker.BuildAndRun("plan", maxVal, branch)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -69,7 +76,11 @@ func applyCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("reading --max flag: %w", err)
 			}
-			return runLoop(loop.ModeBuild, maxVal)
+			branch, err := git.Branch()
+			if err != nil {
+				return fmt.Errorf("getting current branch: %w", err)
+			}
+			return docker.BuildAndRun("build", maxVal, branch)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -85,6 +96,40 @@ func statusCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// loopCmd is the hidden _loop command invoked inside Docker containers.
+// Usage: ralph _loop <plan|build> [max_iterations]
+func loopCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "_loop",
+		Short:  "Internal: run iteration loop directly (used inside containers)",
+		Hidden: true,
+		Args:   cobra.RangeArgs(1, 2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			var mode loop.Mode
+			switch args[0] {
+			case "plan":
+				mode = loop.ModePlan
+			case "build":
+				mode = loop.ModeBuild
+			default:
+				return fmt.Errorf("unknown mode: %s (expected plan or build)", args[0])
+			}
+
+			var maxIter int
+			if len(args) > 1 {
+				v, err := strconv.Atoi(args[1])
+				if err != nil {
+					return fmt.Errorf("invalid max_iterations: %w", err)
+				}
+				maxIter = v
+			}
+
+			return runLoop(mode, maxIter)
+		},
+	}
+	return cmd
 }
 
 func runLoop(mode loop.Mode, maxFlag int) error {

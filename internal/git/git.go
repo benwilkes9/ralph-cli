@@ -42,6 +42,15 @@ func PullRebase(branch string) error {
 	return err
 }
 
+// RemoteURL returns the URL configured for the given remote.
+func RemoteURL(name string) (string, error) {
+	out, err := run("remote", "get-url", name)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 // RepoRoot returns the top-level directory of the git repo.
 func RepoRoot() (string, error) {
 	out, err := run("rev-parse", "--show-toplevel")
