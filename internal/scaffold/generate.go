@@ -86,20 +86,18 @@ func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
 		result.Created = append(result.Created, mapping.output)
 	}
 
-	if info.CreateSpecs {
-		specsDir := filepath.Join(repoRoot, ".ralph", "specs")
-		gitkeep := filepath.Join(specsDir, ".gitkeep")
-		if fileExists(gitkeep) {
-			result.Skipped = append(result.Skipped, ".ralph/specs/.gitkeep")
-		} else {
-			if err := os.MkdirAll(specsDir, 0o750); err != nil {
-				return nil, fmt.Errorf("creating specs dir: %w", err)
-			}
-			if err := os.WriteFile(gitkeep, nil, 0o600); err != nil {
-				return nil, fmt.Errorf("creating .gitkeep: %w", err)
-			}
-			result.Created = append(result.Created, ".ralph/specs/.gitkeep")
+	specsDir := filepath.Join(repoRoot, "specs")
+	gitkeep := filepath.Join(specsDir, ".gitkeep")
+	if fileExists(gitkeep) {
+		result.Skipped = append(result.Skipped, "specs/.gitkeep")
+	} else {
+		if err := os.MkdirAll(specsDir, 0o750); err != nil {
+			return nil, fmt.Errorf("creating specs dir: %w", err)
 		}
+		if err := os.WriteFile(gitkeep, nil, 0o600); err != nil {
+			return nil, fmt.Errorf("creating .gitkeep: %w", err)
+		}
+		result.Created = append(result.Created, "specs/.gitkeep")
 	}
 
 	if err := appendGitignore(repoRoot, result); err != nil {
@@ -183,9 +181,12 @@ func PrintSummary(w io.Writer, result *GenerateResult) {
 	}
 	printLine(w, "")
 	printLine(w, "Next steps:")
-	printLine(w, "  1. Edit .env with your API keys")
+	printLine(w, "  1. Edit .env with your API keys - see .env.example for reference")
 	printLine(w, "  2. Review .ralph/config.yaml")
-	printLine(w, "  3. Run: ralph plan")
+	printLine(w, "  3. Review the prompts in .ralph/prompts/")
+	printLine(w, "  4. Review AGENTS.md")
+	printLine(w, "  5. Ensure the requirements are in the specs/ directory")
+	printLine(w, "  6. Run: ralph plan")
 }
 
 func printLine(w io.Writer, s string) {

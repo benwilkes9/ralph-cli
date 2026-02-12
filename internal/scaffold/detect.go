@@ -49,13 +49,10 @@ type ProjectInfo struct {
 	RunCmd       string
 	Goal         string
 
-	SourceDirs []string
-	TestDirs   []string
-	EnvVars    []string
-
+	SourceDirs  []string
+	TestDirs    []string
 	BaseImage   string
 	HasMakefile bool
-	CreateSpecs bool
 }
 
 // lockFileSignals maps lock/config files to their language and package manager.
@@ -215,11 +212,6 @@ func (p *ProjectInfo) SourceDirsList() string {
 // TestDirsList returns test dirs as a comma-separated string for display.
 func (p *ProjectInfo) TestDirsList() string {
 	return joinOrDefault(p.TestDirs, "tests/")
-}
-
-// EnvVarsList returns env vars as a comma-separated string.
-func (p *ProjectInfo) EnvVarsList() string {
-	return strings.Join(p.EnvVars, ", ")
 }
 
 func joinOrDefault(items []string, fallback string) string {

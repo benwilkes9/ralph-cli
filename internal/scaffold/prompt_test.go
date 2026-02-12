@@ -20,13 +20,15 @@ func (br *byteReader) Read(p []byte) (int, error) {
 	return br.r.Read(p[:1])
 }
 
-func TestRunPrompts_AllDefaults(t *testing.T) {
+func TestRunPrompts_SelectDefaults(t *testing.T) {
 	info := &ProjectInfo{
-		RunCmd: "uv run uvicorn app:app",
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
 	}
-	// In accessible mode: 4 prompts, all accept defaults with empty lines.
-	// Confirm default is true, empty line → yes.
-	input := "\n\n\n\n"
+	// Accessible mode: select option 1 for run command, select option 1 for goal.
+	// Hidden input groups are skipped automatically.
+	input := "1\n1\n"
 	out := &bytes.Buffer{}
 
 	err := RunPrompts(info, &PromptOptions{
@@ -38,25 +40,19 @@ func TestRunPrompts_AllDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertEqual(t, "RunCmd", info.RunCmd, "uv run uvicorn app:app")
-	assertEqual(t, "Goal", info.Goal, "")
-	if !info.CreateSpecs {
-		t.Error("expected CreateSpecs to default to true")
-	}
-	if len(info.EnvVars) != 0 {
-		t.Errorf("expected no EnvVars, got %v", info.EnvVars)
-	}
+	assertEqual(t, "RunCmd", info.RunCmd, "uv run uvicorn myapp.main:app")
+	assertEqual(t, "Goal", info.Goal, "Production-ready REST API")
 }
 
 func TestRunPrompts_CustomValues(t *testing.T) {
 	info := &ProjectInfo{
-		RunCmd: "npm start",
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
 	}
-	// Input 1: override run command
-	// Input 2: set goal
-	// Confirm: "n" to decline specs
-	// Input 3: env vars
-	input := "go run ./cmd/server\nBuild a REST API\nn\nDATABASE_URL, REDIS_URL\n"
+	// Select "Type something." (option 3) for run cmd, then type custom value.
+	// Select "Type something." (option 3) for goal, then type custom value.
+	input := "3\nmy custom cmd\n3\nmy custom goal\n"
 	out := &bytes.Buffer{}
 
 	err := RunPrompts(info, &PromptOptions{
@@ -68,21 +64,17 @@ func TestRunPrompts_CustomValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertEqual(t, "RunCmd", info.RunCmd, "go run ./cmd/server")
-	assertEqual(t, "Goal", info.Goal, "Build a REST API")
-	if info.CreateSpecs {
-		t.Error("expected CreateSpecs to be false")
-	}
-	if len(info.EnvVars) != 2 {
-		t.Fatalf("expected 2 EnvVars, got %v", info.EnvVars)
-	}
-	assertEqual(t, "EnvVars[0]", info.EnvVars[0], "DATABASE_URL")
-	assertEqual(t, "EnvVars[1]", info.EnvVars[1], "REDIS_URL")
+	assertEqual(t, "RunCmd", info.RunCmd, "my custom cmd")
+	assertEqual(t, "Goal", info.Goal, "my custom goal")
 }
 
 func TestRunPrompts_OutputContainsPrompts(t *testing.T) {
-	info := &ProjectInfo{}
-	input := "\n\n\n\n"
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+	}
+	input := "1\n1\n"
 	out := &bytes.Buffer{}
 
 	if err := RunPrompts(info, &PromptOptions{
@@ -94,35 +86,34 @@ func TestRunPrompts_OutputContainsPrompts(t *testing.T) {
 	}
 
 	output := out.String()
-	if !strings.Contains(output, "Run command") {
-		t.Error("expected output to contain 'Run command'")
+	if !strings.Contains(output, "How do you start") {
+		t.Error("expected output to contain 'How do you start'")
 	}
-	if !strings.Contains(output, "Project goal") {
-		t.Error("expected output to contain 'Project goal'")
-	}
-	if !strings.Contains(output, "specs") {
-		t.Error("expected output to contain 'specs'")
-	}
-	if !strings.Contains(output, "env vars") {
-		t.Error("expected output to contain 'env vars'")
+	if !strings.Contains(output, "ultimate goal") {
+		t.Error("expected output to contain 'ultimate goal'")
 	}
 }
 
-func TestRunPrompts_YesNoExplicitYes(t *testing.T) {
-	info := &ProjectInfo{}
-	// Empty for inputs, "y" for confirm, empty for env vars
-	input := "\n\ny\n\n"
+func TestRunPrompts_UnknownLanguageSelectsCustom(t *testing.T) {
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangUnknown,
+		PackageManager: PmUnknown,
+	}
+	// Unknown PM: only "Type something." (option 1) for run → shows input.
+	// Unknown lang: "Learning spike" (option 1), "Type something." (option 2) for goal.
+	input := "1\nmy run cmd\n1\n"
 	out := &bytes.Buffer{}
 
-	if err := RunPrompts(info, &PromptOptions{
+	err := RunPrompts(info, &PromptOptions{
 		In:         &byteReader{strings.NewReader(input)},
 		Out:        out,
 		Accessible: true,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !info.CreateSpecs {
-		t.Error("expected CreateSpecs to be true with explicit 'y'")
-	}
+	assertEqual(t, "RunCmd", info.RunCmd, "my run cmd")
+	assertEqual(t, "Goal", info.Goal, "Learning spike / reference")
 }

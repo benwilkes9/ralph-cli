@@ -7,9 +7,6 @@ missing=()
 [ -z "${GITHUB_PAT:-}" ]       && missing+=("GITHUB_PAT")
 [ -z "${REPO:-}" ]             && missing+=("REPO")
 [ -z "${BRANCH:-}" ]           && missing+=("BRANCH")
-{{- range .EnvVars}}
-[ -z "${ {{- .}}:-}" ]         && missing+=("{{.}}")
-{{- end}}
 
 if [ ${#missing[@]} -gt 0 ]; then
     echo "Error: missing required env vars: ${missing[*]}" >&2

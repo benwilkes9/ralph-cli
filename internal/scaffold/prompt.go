@@ -2,7 +2,6 @@ package scaffold
 
 import (
 	"io"
-	"strings"
 
 	"github.com/charmbracelet/huh"
 )
@@ -16,26 +15,36 @@ type PromptOptions struct {
 
 // RunPrompts asks the user to confirm or override detected values.
 func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
-	var envVars string
-	info.CreateSpecs = true // default to creating specs dir
+	var runChoice, goalChoice string
 
 	form := huh.NewForm(
+		// Group 1: Select run command
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title(runCmdTitle(info)).
+				Options(runCmdOptions(info)...).
+				Value(&runChoice),
+		),
+		// Group 2: Custom run command (shown only if "Type something." selected)
 		huh.NewGroup(
 			huh.NewInput().
-				Title("Run command (how to start the app)").
+				Title("Run command").
 				Value(&info.RunCmd),
-			huh.NewInput().
-				Title("Project goal (one sentence)").
-				Value(&info.Goal),
-			huh.NewConfirm().
-				Title("Create .ralph/specs/ directory?").
-				Affirmative("Yes").
-				Negative("No").
-				Value(&info.CreateSpecs),
-			huh.NewInput().
-				Title("Additional env vars (comma-separated, e.g. DATABASE_URL,REDIS_URL)").
-				Value(&envVars),
+		).WithHideFunc(func() bool { return runChoice != customSentinel }),
+
+		// Group 3: Select goal
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("What is the ultimate goal for this project? (one sentence describing what it should become)").
+				Options(goalOptions(info)...).
+				Value(&goalChoice),
 		),
+		// Group 4: Custom goal (shown only if "Type something." selected)
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Project goal").
+				Value(&info.Goal),
+		).WithHideFunc(func() bool { return goalChoice != customSentinel }),
 	).WithAccessible(opts.Accessible)
 
 	if opts.In != nil {
@@ -49,13 +58,11 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 		return err //nolint:wrapcheck // propagate huh errors directly
 	}
 
-	if envVars != "" {
-		for _, v := range strings.Split(envVars, ",") {
-			v = strings.TrimSpace(v)
-			if v != "" {
-				info.EnvVars = append(info.EnvVars, v)
-			}
-		}
+	if runChoice != customSentinel {
+		info.RunCmd = runChoice
+	}
+	if goalChoice != customSentinel {
+		info.Goal = goalChoice
 	}
 
 	return nil

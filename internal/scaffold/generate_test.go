@@ -22,7 +22,6 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 		RunCmd:          "uv run uvicorn app:app",
 		Goal:            "Build a REST API",
 		BaseImage:       "node:22-bookworm",
-		CreateSpecs:     true,
 	}
 
 	result, err := Generate(dir, info)
@@ -39,7 +38,7 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 		".ralph/docker/entrypoint.sh",
 		".ralph/docker/.dockerignore",
 		".env.example",
-		".ralph/specs/.gitkeep",
+		"specs/.gitkeep",
 	}
 
 	for _, f := range expectedFiles {
@@ -116,8 +115,8 @@ func TestGenerate_SkipsExistingFiles(t *testing.T) {
 	if len(result2.Created) != 0 {
 		t.Errorf("second run should create nothing, got %v", result2.Created)
 	}
-	if len(result2.Skipped) < 8 {
-		t.Errorf("second run should skip at least 8 files, got %d: %v", len(result2.Skipped), result2.Skipped)
+	if len(result2.Skipped) < 9 {
+		t.Errorf("second run should skip at least 9 files, got %d: %v", len(result2.Skipped), result2.Skipped)
 	}
 }
 
@@ -210,27 +209,6 @@ func TestGenerate_EntrypointIsExecutable(t *testing.T) {
 	}
 	if fi.Mode()&0o111 == 0 {
 		t.Error("entrypoint.sh should be executable")
-	}
-}
-
-func TestGenerate_NoSpecsDirWhenNotRequested(t *testing.T) {
-	dir := t.TempDir()
-	info := &ProjectInfo{
-		ProjectName:    "test-project",
-		Language:       LangPython,
-		PackageManager: PmUV,
-		InstallCmd:     "uv sync",
-		TestCmd:        "uv run pytest",
-		BaseImage:      "node:22-bookworm",
-		CreateSpecs:    false,
-	}
-
-	if _, err := Generate(dir, info); err != nil {
-		t.Fatal(err)
-	}
-
-	if fileExists(filepath.Join(dir, ".ralph", "specs")) {
-		t.Error("specs dir should not be created when CreateSpecs is false")
 	}
 }
 
