@@ -46,8 +46,8 @@ RUN useradd -m -s /bin/bash claude \
 # Project-specific layers
 # ═════════════════════════════════════════════════════════════════
 
-COPY .ralph/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY --chown=root:claude .ralph/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 750 /usr/local/bin/entrypoint.sh
 
 USER claude
 WORKDIR /workspace
