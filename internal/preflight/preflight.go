@@ -11,7 +11,7 @@ import (
 // Check runs pre-flight validation before launching Docker. It verifies that
 // .ralph/ scaffold files exist on disk, auto-commits them if needed, ensures
 // the specs and plans directories are tracked, and pushes the branch to the remote.
-func Check(branch string) error {
+func Check(branch, specsDir, planFile string) error {
 	repoRoot, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("preflight: finding repo root: %w", err)
@@ -42,7 +42,7 @@ func Check(branch string) error {
 	}
 
 	// 2b. Auto-commit specs dir and plans dir if present but untracked.
-	for _, dir := range []string{"specs", ".ralph/plans"} {
+	for _, dir := range []string{specsDir, filepath.Dir(planFile)} {
 		dirPath := filepath.Join(repoRoot, dir)
 		if _, statErr := os.Stat(dirPath); os.IsNotExist(statErr) {
 			continue
@@ -76,7 +76,7 @@ func Check(branch string) error {
 	}
 
 	// 4. Push any unpushed changes in .ralph/, specs/, or plans.
-	for _, path := range []string{".ralph/", "specs/"} {
+	for _, path := range []string{".ralph/", specsDir + "/"} {
 		diff, err := git.DiffFromRemote(branch, path)
 		if err != nil {
 			return fmt.Errorf("preflight: checking unpushed changes in %s: %w", path, err)

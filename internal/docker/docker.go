@@ -46,7 +46,7 @@ func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir stri
 		return err
 	}
 
-	if err := preflight.Check(branch); err != nil {
+	if err := preflight.Check(branch, specsDir, planFile); err != nil {
 		return fmt.Errorf("preflight: %w", err)
 	}
 
