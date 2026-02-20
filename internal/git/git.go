@@ -122,15 +122,15 @@ func SanitizeBranch(branch string) string {
 	return s
 }
 
-// protectedBranches is the set of branch names where plan/apply must not run.
-var protectedBranches = map[string]bool{
-	"main":   true,
-	"master": true,
-}
-
-// IsProtectedBranch returns true if the branch is main or master.
-func IsProtectedBranch(branch string) bool {
-	return protectedBranches[branch]
+// IsProtectedBranch returns true if branch matches any entry in the protected
+// list (case-insensitive comparison).
+func IsProtectedBranch(branch string, protected []string) bool {
+	for _, p := range protected {
+		if strings.EqualFold(branch, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func run(args ...string) (string, error) {

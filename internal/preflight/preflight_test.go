@@ -165,6 +165,66 @@ func TestCheck_AutoPushesUnpushedChanges(t *testing.T) {
 	}
 }
 
+func TestCheck_AutoCommitsSpecsDir(t *testing.T) {
+	clone := initBareAndClone(t)
+	chdir(t, clone)
+	writeScaffold(t, clone)
+
+	// Commit and push scaffold so it's tracked.
+	runGit(t, clone, "add", ".ralph/")
+	runGit(t, clone, "commit", "-m", "add scaffold")
+	runGit(t, clone, "push", "origin", "main")
+
+	// Create untracked specs dir with .gitkeep.
+	specsDir := filepath.Join(clone, "specs")
+	if err := os.MkdirAll(specsDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specsDir, ".gitkeep"), []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Check("main")
+	if err != nil {
+		t.Fatalf("expected no error, got: %s", err)
+	}
+
+	log := gitLog(t, clone)
+	if !strings.Contains(log, "chore: add specs directory") {
+		t.Errorf("expected auto-commit for specs dir in log, got:\n%s", log)
+	}
+}
+
+func TestCheck_AutoCommitsPlansDir(t *testing.T) {
+	clone := initBareAndClone(t)
+	chdir(t, clone)
+	writeScaffold(t, clone)
+
+	// Commit and push scaffold so it's tracked.
+	runGit(t, clone, "add", ".ralph/")
+	runGit(t, clone, "commit", "-m", "add scaffold")
+	runGit(t, clone, "push", "origin", "main")
+
+	// Create untracked .ralph/plans dir with .gitkeep.
+	plansDir := filepath.Join(clone, ".ralph", "plans")
+	if err := os.MkdirAll(plansDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(plansDir, ".gitkeep"), []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Check("main")
+	if err != nil {
+		t.Fatalf("expected no error, got: %s", err)
+	}
+
+	log := gitLog(t, clone)
+	if !strings.Contains(log, "chore: add .ralph/plans directory") {
+		t.Errorf("expected auto-commit for plans dir in log, got:\n%s", log)
+	}
+}
+
 func TestCheck_AllClean(t *testing.T) {
 	clone := initBareAndClone(t)
 	chdir(t, clone)

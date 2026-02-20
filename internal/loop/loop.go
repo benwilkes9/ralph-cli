@@ -198,7 +198,7 @@ func runClaude(ctx context.Context, opts *Options, logW *logfile.Writer, display
 	fmt.Fprintf(&header, "BRANCH: %s\n", opts.Branch)
 	header.WriteString("---\n")
 
-	combined := append(header.Bytes(), promptContent...)
+	combined := bytes.Join([][]byte{header.Bytes(), promptContent}, nil)
 	cmd.Stdin = bytes.NewReader(combined)
 
 	stdout, err := cmd.StdoutPipe()

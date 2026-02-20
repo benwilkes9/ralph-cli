@@ -30,22 +30,32 @@ func TestSanitizeBranch(t *testing.T) {
 }
 
 func TestIsProtectedBranch(t *testing.T) {
+	defaultProtected := []string{"main", "master"}
+
 	tests := []struct {
-		branch string
-		want   bool
+		branch    string
+		protected []string
+		want      bool
 	}{
-		{"main", true},
-		{"master", true},
-		{"develop", false},
-		{"feature/auth", false},
-		{"main-feature", false},
+		{"main", defaultProtected, true},
+		{"master", defaultProtected, true},
+		{"Main", defaultProtected, true},
+		{"MASTER", defaultProtected, true},
+		{"develop", defaultProtected, false},
+		{"feature/auth", defaultProtected, false},
+		{"main-feature", defaultProtected, false},
+		{"develop", []string{"develop", "staging"}, true},
+		{"staging", []string{"develop", "staging"}, true},
+		{"main", []string{"develop", "staging"}, false},
+		{"main", nil, false},
+		{"main", []string{}, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.branch, func(t *testing.T) {
-			got := IsProtectedBranch(tt.branch)
+			got := IsProtectedBranch(tt.branch, tt.protected)
 			if got != tt.want {
-				t.Errorf("IsProtectedBranch(%q) = %v, want %v", tt.branch, got, tt.want)
+				t.Errorf("IsProtectedBranch(%q, %v) = %v, want %v", tt.branch, tt.protected, got, tt.want)
 			}
 		})
 	}

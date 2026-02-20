@@ -71,51 +71,78 @@ func initCmd() *cobra.Command {
 	}
 }
 
+// runParams holds resolved parameters shared by planCmd and applyCmd.
+type runParams struct {
+	maxVal   int
+	branch   string
+	planFile string
+	specsDir string
+	repoRoot string
+}
+
+// resolveRunParams extracts flags, resolves the branch, checks protection,
+// sanitizes the branch name, loads config, and computes paths.
+func resolveRunParams(cmd *cobra.Command) (*runParams, error) {
+	maxVal, err := cmd.Flags().GetInt("max")
+	if err != nil {
+		return nil, fmt.Errorf("reading --max flag: %w", err)
+	}
+	specsDir, err := cmd.Flags().GetString("specs")
+	if err != nil {
+		return nil, fmt.Errorf("reading --specs flag: %w", err)
+	}
+
+	repoRoot, err := git.RepoRoot()
+	if err != nil {
+		return nil, fmt.Errorf("finding repo root: %w", err)
+	}
+	cfg, err := config.Load(repoRoot)
+	if err != nil {
+		return nil, fmt.Errorf("loading config: %w", err)
+	}
+
+	branch, err := git.Branch()
+	if err != nil {
+		return nil, fmt.Errorf("getting current branch: %w", err)
+	}
+	if git.IsProtectedBranch(branch, cfg.ProtectedBranches) {
+		return nil, fmt.Errorf("ralph %s must be run on a feature branch, not %q", cmd.Name(), branch)
+	}
+
+	sanitized := git.SanitizeBranch(branch)
+	if specsDir == "" {
+		specsDir = "specs/" + sanitized
+	}
+	planFile := cfg.PlanPathForBranch(sanitized)
+
+	return &runParams{
+		maxVal:   maxVal,
+		branch:   branch,
+		planFile: planFile,
+		specsDir: specsDir,
+		repoRoot: repoRoot,
+	}, nil
+}
+
 func planCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan",
 		Short: "Run planning loop (generates branch-specific plan)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			maxVal, err := cmd.Flags().GetInt("max")
+			p, err := resolveRunParams(cmd)
 			if err != nil {
-				return fmt.Errorf("reading --max flag: %w", err)
+				return err
 			}
-			specsDir, err := cmd.Flags().GetString("specs")
-			if err != nil {
-				return fmt.Errorf("reading --specs flag: %w", err)
-			}
-			branch, err := git.Branch()
-			if err != nil {
-				return fmt.Errorf("getting current branch: %w", err)
-			}
-			if git.IsProtectedBranch(branch) {
-				return fmt.Errorf("ralph plan must be run on a feature branch, not %q", branch)
-			}
-
-			sanitized := git.SanitizeBranch(branch)
-			if specsDir == "" {
-				specsDir = "specs/" + sanitized
-			}
-
-			repoRoot, err := git.RepoRoot()
-			if err != nil {
-				return fmt.Errorf("finding repo root: %w", err)
-			}
-			cfg, err := config.Load(repoRoot)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-			planFile := cfg.PlanPathForBranch(branch)
 
 			// Ensure specs and plans directories exist.
-			if err := os.MkdirAll(filepath.Join(repoRoot, specsDir), 0o750); err != nil {
+			if err := os.MkdirAll(filepath.Join(p.repoRoot, p.specsDir), 0o750); err != nil {
 				return fmt.Errorf("creating specs dir: %w", err)
 			}
-			if err := os.MkdirAll(filepath.Join(repoRoot, filepath.Dir(planFile)), 0o750); err != nil {
+			if err := os.MkdirAll(filepath.Join(p.repoRoot, filepath.Dir(p.planFile)), 0o750); err != nil {
 				return fmt.Errorf("creating plans dir: %w", err)
 			}
 
-			return docker.BuildAndRun("plan", maxVal, branch, planFile, specsDir)
+			return docker.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -128,38 +155,17 @@ func applyCmd() *cobra.Command {
 		Use:   "apply",
 		Short: "Run build loop (implements tasks one at a time)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			maxVal, err := cmd.Flags().GetInt("max")
+			p, err := resolveRunParams(cmd)
 			if err != nil {
-				return fmt.Errorf("reading --max flag: %w", err)
-			}
-			specsDir, err := cmd.Flags().GetString("specs")
-			if err != nil {
-				return fmt.Errorf("reading --specs flag: %w", err)
-			}
-			branch, err := git.Branch()
-			if err != nil {
-				return fmt.Errorf("getting current branch: %w", err)
-			}
-			if git.IsProtectedBranch(branch) {
-				return fmt.Errorf("ralph apply must be run on a feature branch, not %q", branch)
+				return err
 			}
 
-			sanitized := git.SanitizeBranch(branch)
-			if specsDir == "" {
-				specsDir = "specs/" + sanitized
+			planPath := filepath.Join(p.repoRoot, p.planFile)
+			if _, err := os.Stat(planPath); os.IsNotExist(err) {
+				return fmt.Errorf("plan file %q not found; run \"ralph plan\" first", p.planFile)
 			}
 
-			repoRoot, err := git.RepoRoot()
-			if err != nil {
-				return fmt.Errorf("finding repo root: %w", err)
-			}
-			cfg, err := config.Load(repoRoot)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-			planFile := cfg.PlanPathForBranch(branch)
-
-			return docker.BuildAndRun("build", maxVal, branch, planFile, specsDir)
+			return docker.BuildAndRun("build", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -187,7 +193,7 @@ func statusCmd() *cobra.Command {
 				return fmt.Errorf("getting branch: %w", err)
 			}
 
-			planPath := cfg.PlanPathForBranch(branch)
+			planPath := cfg.PlanPathForBranch(git.SanitizeBranch(branch))
 
 			tasks, err := status.ParsePlan(planPath)
 			if err != nil {
@@ -275,7 +281,7 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 	// Plan file and specs dir are passed from the host via env vars.
 	planFile := os.Getenv("PLAN_FILE")
 	if planFile == "" {
-		planFile = cfg.PlanPathForBranch(branch)
+		planFile = cfg.PlanPathForBranch(git.SanitizeBranch(branch))
 	}
 	specsDir := os.Getenv("SPECS_DIR")
 	if specsDir == "" {

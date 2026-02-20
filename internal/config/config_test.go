@@ -125,7 +125,7 @@ func TestPlanPathForBranch_DefaultDir(t *testing.T) {
 	cfg := &Config{}
 	cfg.applyDefaults()
 
-	got := cfg.PlanPathForBranch("feature/auth-flow")
+	got := cfg.PlanPathForBranch("feature-auth-flow")
 	want := ".ralph/plans/IMPLEMENTATION_PLAN_feature-auth-flow.md"
 	if got != want {
 		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
@@ -139,7 +139,7 @@ func TestPlanPathForBranch_CustomFile(t *testing.T) {
 		},
 	}
 
-	got := cfg.PlanPathForBranch("feat/login")
+	got := cfg.PlanPathForBranch("feat-login")
 	want := "my-plan_feat-login.md"
 	if got != want {
 		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
@@ -153,7 +153,7 @@ func TestPlanPathForBranch_CustomDir(t *testing.T) {
 		},
 	}
 
-	got := cfg.PlanPathForBranch("fix/bug-123")
+	got := cfg.PlanPathForBranch("fix-bug-123")
 	want := "plans/IMPLEMENTATION_PLAN_fix-bug-123.md"
 	if got != want {
 		t.Errorf("PlanPathForBranch = %q, want %q", got, want)

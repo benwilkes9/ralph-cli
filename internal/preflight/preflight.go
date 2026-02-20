@@ -49,7 +49,7 @@ func Check(branch string) error {
 		}
 		dirTracked, trackErr := git.IsTracked(filepath.Join(dir, ".gitkeep"))
 		if trackErr != nil {
-			continue // best-effort
+			return fmt.Errorf("preflight: checking git tracking for %s: %w", dir, trackErr)
 		}
 		if !dirTracked {
 			fmt.Printf("Committing %s/ directory...\n", dir)

@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-
-	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 // Config holds the ralph project configuration loaded from .ralph/config.yaml.
@@ -16,8 +14,9 @@ type Config struct {
 	Project string `yaml:"project"`
 	Agent   string `yaml:"agent"`
 
-	Backpressure Backpressure `yaml:"backpressure"`
-	Phases       Phases       `yaml:"phases"`
+	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
+	Backpressure      Backpressure `yaml:"backpressure"`
+	Phases            Phases       `yaml:"phases"`
 }
 
 // Backpressure defines the commands used to validate code quality between iterations.
@@ -94,6 +93,9 @@ func (c *Config) applyDefaults() {
 	if c.Agent == "" {
 		c.Agent = "claude"
 	}
+	if c.ProtectedBranches == nil {
+		c.ProtectedBranches = []string{"main", "master"}
+	}
 	if c.Phases.Plan.Prompt == "" {
 		c.Phases.Plan.Prompt = ".ralph/prompts/plan.md"
 	}
@@ -112,20 +114,20 @@ func (c *Config) applyDefaults() {
 }
 
 // PlanPathForBranch returns the branch-specific plan file path.
+// sanitizedBranch must already be sanitized via git.SanitizeBranch.
 // If the configured output is a directory (ends with /), the plan file is
 // placed inside it as IMPLEMENTATION_PLAN_{sanitized-branch}.md.
 // If the user set a custom file path, the branch suffix is inserted before
 // the extension.
-func (c *Config) PlanPathForBranch(branch string) string {
-	sanitized := git.SanitizeBranch(branch)
+func (c *Config) PlanPathForBranch(sanitizedBranch string) string {
 	output := c.Phases.Plan.Output
 
 	if strings.HasSuffix(output, "/") {
-		return output + "IMPLEMENTATION_PLAN_" + sanitized + ".md"
+		return output + "IMPLEMENTATION_PLAN_" + sanitizedBranch + ".md"
 	}
 
 	// Custom file path: insert branch before extension.
 	ext := filepath.Ext(output)
 	base := strings.TrimSuffix(output, ext)
-	return base + "_" + sanitized + ext
+	return base + "_" + sanitizedBranch + ext
 }
