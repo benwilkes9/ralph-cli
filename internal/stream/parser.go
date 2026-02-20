@@ -3,6 +3,7 @@ package stream
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 )
 
@@ -79,7 +80,7 @@ func (p *Parser) Next() (*Event, error) {
 	}
 
 	if err := p.scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanning stream: %w", err)
 	}
 	return nil, io.EOF
 }

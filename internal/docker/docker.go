@@ -47,7 +47,7 @@ func BuildAndRun(mode string, maxIterations int, branch string) error {
 	}
 
 	if err := preflight.Check(branch); err != nil {
-		return err
+		return fmt.Errorf("preflight: %w", err)
 	}
 
 	if err := Build(DefaultDockerfile, DefaultTag, DefaultContext); err != nil {

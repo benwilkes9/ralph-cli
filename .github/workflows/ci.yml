@@ -19,9 +19,20 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v7
 
-      - run: make test
+      - name: test
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out
 
       - run: make build
+
+      - name: nilaway
+        run: |
+          go install go.uber.org/nilaway/cmd/nilaway@latest
+          nilaway ./...
 
       - name: govulncheck
         run: |

@@ -2,6 +2,8 @@ package git
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -78,7 +80,8 @@ func IsTracked(path string) (bool, error) {
 	_, err := run("ls-files", "--error-unmatch", path)
 	if err != nil {
 		// Exit code 1 means not tracked — not an error for our purposes.
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 { //nolint:errorlint // exec.ExitError is concrete
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
 			return false, nil
 		}
 		return false, err
@@ -106,10 +109,13 @@ func DiffFromRemote(branch, path string) (string, error) {
 }
 
 func run(args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("git: no subcommand specified")
+	}
 	cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // args are hardcoded by callers in this package
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("git %s: %w", args[0], err)
 	}
 	return string(out), nil
 }

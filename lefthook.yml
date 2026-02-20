@@ -8,6 +8,12 @@ pre-commit:
     test:
       run: make test
       fail_text: "Tests failed."
+    nilaway:
+      run: nilaway ./...
+      fail_text: "Nil safety issues found. Run 'nilaway ./...' for details."
+    govulncheck:
+      run: govulncheck ./...
+      fail_text: "Vulnerable dependencies found. Run 'govulncheck ./...' for details."
     gitleaks:
       run: gitleaks protect --staged
       fail_text: "Secrets detected! Remove them before committing."

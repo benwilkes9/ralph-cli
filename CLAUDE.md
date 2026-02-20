@@ -2,7 +2,7 @@
 
 ## Project
 
-Ralph CLI — a Go CLI that orchestrates autonomous plan/build iteration loops using Claude Code. Replaces a bash-based workflow with a single binary.
+Ralph CLI — a Go CLI that orchestrates autonomous plan/build iteration loops using Claude Code.
 
 ## Commands
 
@@ -30,12 +30,27 @@ Run before committing (managed by lefthook):
 go tool lefthook run pre-commit
 ```
 
-This runs in parallel:
-- `golangci-lint run --fix ./...` — lint + auto-fix
-- `make test` — all tests
+This runs 5 checks in parallel:
+- `golangci-lint run --fix ./...` — lint + auto-fix (30+ linters)
+- `make test` — all tests with `-race` and goroutine leak detection (goleak)
+- `nilaway ./...` — interprocedural nil pointer analysis
+- `govulncheck ./...` — dependency vulnerability scanning
 - `gitleaks protect --staged` — secret detection
 
 Always run this before committing code.
+
+## CI Pipeline
+
+GitHub Actions runs on every push and PR:
+- golangci-lint, tests with coverage (uploaded to Codecov), build, nilaway, govulncheck, gitleaks
+
+## Releases
+
+Tag-triggered via goreleaser (`git tag v0.1.0 && git push origin v0.1.0`):
+- Builds linux/darwin x amd64/arm64 binaries
+- Cosign signs checksums (keyless via GitHub OIDC)
+- Syft generates SBOMs (SPDX-JSON)
+- SLSA Level 3 provenance via slsa-github-generator
 
 ## Architecture
 

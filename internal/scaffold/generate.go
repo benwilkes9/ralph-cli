@@ -110,14 +110,17 @@ func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
 func renderToFile(path string, tmpl *template.Template, data any) error {
 	f, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating %s: %w", filepath.Base(path), err)
 	}
 	execErr := tmpl.Execute(f, data)
 	closeErr := f.Close()
 	if execErr != nil {
-		return execErr
+		return fmt.Errorf("executing template for %s: %w", filepath.Base(path), execErr)
 	}
-	return closeErr
+	if closeErr != nil {
+		return fmt.Errorf("closing %s: %w", filepath.Base(path), closeErr)
+	}
+	return nil
 }
 
 func appendGitignore(repoRoot string, result *GenerateResult) error {

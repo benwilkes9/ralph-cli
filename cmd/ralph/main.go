@@ -238,5 +238,8 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 		os.Exit(130)
 	}
 
-	return loopErr
+	if loopErr != nil {
+		return fmt.Errorf("running loop: %w", loopErr)
+	}
+	return nil
 }

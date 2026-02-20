@@ -37,10 +37,10 @@ func (w *Writer) Path() string {
 
 // Write implements io.Writer, writing raw bytes to the log file.
 func (w *Writer) Write(p []byte) (int, error) {
-	return w.file.Write(p)
+	return w.file.Write(p) //nolint:wrapcheck // thin io.Writer implementation
 }
 
 // Close closes the log file.
 func (w *Writer) Close() error {
-	return w.file.Close()
+	return w.file.Close() //nolint:wrapcheck // thin io.Closer implementation
 }

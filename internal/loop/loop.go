@@ -211,7 +211,7 @@ func runClaude(ctx context.Context, promptPath string, logW *logfile.Writer, dis
 	}
 
 	if processErr != nil {
-		return stats, processErr
+		return stats, fmt.Errorf("processing stream: %w", processErr)
 	}
 	if waitErr != nil {
 		return stats, fmt.Errorf("claude exited: %w", waitErr)

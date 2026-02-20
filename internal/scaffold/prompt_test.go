@@ -17,7 +17,7 @@ func (br *byteReader) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	return br.r.Read(p[:1])
+	return br.r.Read(p[:1]) //nolint:wrapcheck // test helper
 }
 
 func TestRunPrompts_SelectDefaults(t *testing.T) {

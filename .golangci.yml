@@ -14,6 +14,20 @@ linters:
 
     # Security
     - gosec             # Security problems
+    - bidichk           # Dangerous unicode bidirectional characters
+
+    # Context hygiene
+    - fatcontext        # context.WithValue/WithCancel in loops (leaks)
+    - containedctx      # context.Context stored in structs
+
+    # Bug prevention
+    - durationcheck     # time.Duration * time.Duration bugs
+    - reassign          # Package-level variable reassignment
+    - wrapcheck         # Errors from external packages must be wrapped
+
+    # Test quality
+    - thelper           # Enforces t.Helper() on test helpers
+    - tparallel         # Incorrect t.Parallel() usage
 
     # Style & quality
     - gocritic          # Opinionated best practices

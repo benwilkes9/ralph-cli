@@ -85,7 +85,7 @@ func (f *Formatter) formatAssistant(evt *Event) error {
 		switch block.Type {
 		case "text":
 			if _, err := fmt.Fprintf(f.w, "%s%s%s%s\n", Bold, White, block.Text, Reset); err != nil {
-				return err
+				return fmt.Errorf("writing text block: %w", err)
 			}
 		case contentToolUse:
 			if err := f.formatToolUse(&block); err != nil {
@@ -102,7 +102,7 @@ func (f *Formatter) formatToolUse(block *ContentBlock) error {
 	}
 	param := extractParam(block.Input)
 	if _, err := fmt.Fprintf(f.w, "  %s· %s %s%s\n", Dim, block.Name, param, Reset); err != nil {
-		return err
+		return fmt.Errorf("writing tool use: %w", err)
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ func (f *Formatter) formatTaskToolUse(block *ContentBlock) error {
 	}
 
 	if _, err := fmt.Fprintln(f.w, line); err != nil {
-		return err
+		return fmt.Errorf("writing task tool use: %w", err)
 	}
 	return nil
 }
@@ -156,7 +156,7 @@ func (f *Formatter) formatUser(evt *Event) error {
 		tokens := FormatTokens(tr.TotalTokens)
 		if _, err := fmt.Fprintf(f.w, "    %s✓ %s%s%ss, %s tool calls, %s tokens%s\n",
 			Green, Reset, Dim, duration, tools, tokens, Reset); err != nil {
-			return err
+			return fmt.Errorf("writing tool result: %w", err)
 		}
 	} else {
 		status := tr.Status
@@ -164,7 +164,7 @@ func (f *Formatter) formatUser(evt *Event) error {
 			status = "unknown"
 		}
 		if _, err := fmt.Fprintf(f.w, "    %s✗ %s%s\n", BoldRed, status, Reset); err != nil {
-			return err
+			return fmt.Errorf("writing tool error: %w", err)
 		}
 	}
 	return nil

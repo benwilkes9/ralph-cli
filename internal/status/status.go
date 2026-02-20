@@ -109,7 +109,7 @@ func ParseLogs(logsDir string) ([]RunInfo, error) {
 func extractCost(path string) (float64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("opening log %s: %w", filepath.Base(path), err)
 	}
 	defer f.Close() //nolint:errcheck // read-only
 
@@ -120,7 +120,7 @@ func extractCost(path string) (float64, error) {
 			break
 		}
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("parsing log %s: %w", filepath.Base(path), err)
 		}
 		if evt.Type == "result" && evt.TotalCostUSD > 0 {
 			return evt.TotalCostUSD, nil
