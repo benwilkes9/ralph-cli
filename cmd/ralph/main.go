@@ -23,9 +23,10 @@ var version = "dev"
 
 func main() {
 	root := &cobra.Command{
-		Use:     "ralph",
-		Short:   "Autonomous plan/build iteration using Claude Code",
-		Version: version,
+		Use:          "ralph",
+		Short:        "Autonomous plan/build iteration using Claude Code",
+		Version:      version,
+		SilenceUsage: true,
 	}
 
 	root.AddCommand(initCmd())

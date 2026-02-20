@@ -122,7 +122,7 @@ func Run(ctx context.Context, opts *Options, w io.Writer) error {
 	saveState(opts, cumStats, startTime, logPaths, cancelled, staleAborted)
 
 	if staleAborted {
-		return fmt.Errorf("stale loop: %d consecutive iterations with no commits", stale.MaxStale())
+		return nil
 	}
 	if cancelled {
 		return ctx.Err() //nolint:wrapcheck // propagate context cancellation directly
