@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
+	"github.com/benwilkes9/ralph-cli/internal/preflight"
 )
 
 var requiredEnvVars = []string{"ANTHROPIC_API_KEY", "GITHUB_PAT"}
@@ -42,6 +43,10 @@ func BuildAndRun(mode string, maxIterations int, branch string) error {
 	}
 
 	if err := ValidateEnv(env, requiredEnvVars); err != nil {
+		return err
+	}
+
+	if err := preflight.Check(branch); err != nil {
 		return err
 	}
 

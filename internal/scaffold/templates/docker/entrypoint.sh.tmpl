@@ -28,7 +28,11 @@ unset GITHUB_PAT
 cd /workspace/repo
 git init
 git remote add origin "https://github.com/${REPO}.git"
-git fetch origin "$BRANCH"
+if ! git fetch origin "$BRANCH" 2>/dev/null; then
+    echo "Error: branch '$BRANCH' not found on remote '${REPO}'." >&2
+    echo "Push it first:  git push -u origin $BRANCH" >&2
+    exit 1
+fi
 git checkout -b "$BRANCH" "origin/$BRANCH"
 
 # ─── Install project dependencies ───────────────────────────────

@@ -1,0 +1,70 @@
+package preflight
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/benwilkes9/ralph-cli/internal/git"
+)
+
+// Check runs pre-flight validation before launching Docker. It verifies that
+// .ralph/ scaffold files exist on disk, auto-commits them if needed, and
+// pushes the branch to the remote.
+func Check(branch string) error {
+	repoRoot, err := git.RepoRoot()
+	if err != nil {
+		return fmt.Errorf("preflight: finding repo root: %w", err)
+	}
+
+	configPath := filepath.Join(repoRoot, ".ralph", "config.yaml")
+
+	// 1. Config must exist locally.
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return fmt.Errorf(`".ralph/config.yaml" not found, run "ralph init" first`)
+	} else if err != nil {
+		return fmt.Errorf("preflight: checking config: %w", err)
+	}
+
+	// 2. Auto-commit .ralph/ if not tracked.
+	tracked, err := git.IsTracked(".ralph/config.yaml")
+	if err != nil {
+		return fmt.Errorf("preflight: checking git tracking: %w", err)
+	}
+	if !tracked {
+		fmt.Println("Committing .ralph/ scaffold files...")
+		if err := git.Add(".ralph/"); err != nil {
+			return fmt.Errorf("preflight: git add .ralph/: %w", err)
+		}
+		if err := git.Commit("chore: scaffold ralph"); err != nil {
+			return fmt.Errorf("preflight: git commit: %w", err)
+		}
+	}
+
+	// 3. Push branch to remote if it doesn't exist there yet.
+	exists, err := git.BranchExistsOnRemote(branch)
+	if err != nil {
+		return fmt.Errorf("preflight: checking remote branch: %w", err)
+	}
+	if !exists {
+		fmt.Printf("Pushing branch %q to origin...\n", branch)
+		if err := git.PushSetUpstream(branch); err != nil {
+			return fmt.Errorf("preflight: git push -u origin %s: %w", branch, err)
+		}
+		return nil
+	}
+
+	// 4. Push any unpushed .ralph/ changes.
+	diff, err := git.DiffFromRemote(branch, ".ralph/")
+	if err != nil {
+		return fmt.Errorf("preflight: checking unpushed changes: %w", err)
+	}
+	if diff != "" {
+		fmt.Println("Pushing .ralph/ changes to origin...")
+		if err := git.Push(branch); err != nil {
+			return fmt.Errorf("preflight: git push: %w", err)
+		}
+	}
+
+	return nil
+}
