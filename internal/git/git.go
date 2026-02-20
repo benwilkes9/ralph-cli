@@ -61,7 +61,7 @@ func RepoRoot() (string, error) {
 }
 
 func run(args ...string) (string, error) {
-	cmd := exec.CommandContext(context.Background(), "git", args...)
+	cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // args are hardcoded by callers in this package
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
