@@ -39,6 +39,7 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 		".ralph/docker/.dockerignore",
 		".env.example",
 		"specs/.gitkeep",
+		".ralph/plans/.gitkeep",
 	}
 
 	for _, f := range expectedFiles {
@@ -115,8 +116,8 @@ func TestGenerate_SkipsExistingFiles(t *testing.T) {
 	if len(result2.Created) != 0 {
 		t.Errorf("second run should create nothing, got %v", result2.Created)
 	}
-	if len(result2.Skipped) < 9 {
-		t.Errorf("second run should skip at least 9 files, got %d: %v", len(result2.Skipped), result2.Skipped)
+	if len(result2.Skipped) < 10 {
+		t.Errorf("second run should skip at least 10 files, got %d: %v", len(result2.Skipped), result2.Skipped)
 	}
 }
 

@@ -74,20 +74,52 @@ func initCmd() *cobra.Command {
 func planCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan",
-		Short: "Run planning loop (generates .ralph/IMPLEMENTATION_PLAN.md)",
+		Short: "Run planning loop (generates branch-specific plan)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			maxVal, err := cmd.Flags().GetInt("max")
 			if err != nil {
 				return fmt.Errorf("reading --max flag: %w", err)
 			}
+			specsDir, err := cmd.Flags().GetString("specs")
+			if err != nil {
+				return fmt.Errorf("reading --specs flag: %w", err)
+			}
 			branch, err := git.Branch()
 			if err != nil {
 				return fmt.Errorf("getting current branch: %w", err)
 			}
-			return docker.BuildAndRun("plan", maxVal, branch)
+			if git.IsProtectedBranch(branch) {
+				return fmt.Errorf("ralph plan must be run on a feature branch, not %q", branch)
+			}
+
+			sanitized := git.SanitizeBranch(branch)
+			if specsDir == "" {
+				specsDir = "specs/" + sanitized
+			}
+
+			repoRoot, err := git.RepoRoot()
+			if err != nil {
+				return fmt.Errorf("finding repo root: %w", err)
+			}
+			cfg, err := config.Load(repoRoot)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+			planFile := cfg.PlanPathForBranch(branch)
+
+			// Ensure specs and plans directories exist.
+			if err := os.MkdirAll(filepath.Join(repoRoot, specsDir), 0o750); err != nil {
+				return fmt.Errorf("creating specs dir: %w", err)
+			}
+			if err := os.MkdirAll(filepath.Join(repoRoot, filepath.Dir(planFile)), 0o750); err != nil {
+				return fmt.Errorf("creating plans dir: %w", err)
+			}
+
+			return docker.BuildAndRun("plan", maxVal, branch, planFile, specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
+	cmd.Flags().String("specs", "", "specs directory (default: specs/{branch})")
 	return cmd
 }
 
@@ -100,14 +132,38 @@ func applyCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("reading --max flag: %w", err)
 			}
+			specsDir, err := cmd.Flags().GetString("specs")
+			if err != nil {
+				return fmt.Errorf("reading --specs flag: %w", err)
+			}
 			branch, err := git.Branch()
 			if err != nil {
 				return fmt.Errorf("getting current branch: %w", err)
 			}
-			return docker.BuildAndRun("build", maxVal, branch)
+			if git.IsProtectedBranch(branch) {
+				return fmt.Errorf("ralph apply must be run on a feature branch, not %q", branch)
+			}
+
+			sanitized := git.SanitizeBranch(branch)
+			if specsDir == "" {
+				specsDir = "specs/" + sanitized
+			}
+
+			repoRoot, err := git.RepoRoot()
+			if err != nil {
+				return fmt.Errorf("finding repo root: %w", err)
+			}
+			cfg, err := config.Load(repoRoot)
+			if err != nil {
+				return fmt.Errorf("loading config: %w", err)
+			}
+			planFile := cfg.PlanPathForBranch(branch)
+
+			return docker.BuildAndRun("build", maxVal, branch, planFile, specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
+	cmd.Flags().String("specs", "", "specs directory (default: specs/{branch})")
 	return cmd
 }
 
@@ -131,10 +187,7 @@ func statusCmd() *cobra.Command {
 				return fmt.Errorf("getting branch: %w", err)
 			}
 
-			planPath := cfg.Phases.Plan.Output
-			if planPath == "" {
-				planPath = ".ralph/IMPLEMENTATION_PLAN.md"
-			}
+			planPath := cfg.PlanPathForBranch(branch)
 
 			tasks, err := status.ParsePlan(planPath)
 			if err != nil {
@@ -219,6 +272,16 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 		return fmt.Errorf("getting current branch: %w", err)
 	}
 
+	// Plan file and specs dir are passed from the host via env vars.
+	planFile := os.Getenv("PLAN_FILE")
+	if planFile == "" {
+		planFile = cfg.PlanPathForBranch(branch)
+	}
+	specsDir := os.Getenv("SPECS_DIR")
+	if specsDir == "" {
+		specsDir = "specs/" + git.SanitizeBranch(branch)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 
 	opts := &loop.Options{
@@ -229,6 +292,8 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 		LogsDir:       "logs",
 		Branch:        branch,
 		StateFile:     state.DefaultPath,
+		PlanFile:      planFile,
+		SpecsDir:      specsDir,
 	}
 
 	loopErr := loop.Run(ctx, opts, os.Stdout)

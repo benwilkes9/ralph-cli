@@ -121,6 +121,45 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	}
 }
 
+func TestPlanPathForBranch_DefaultDir(t *testing.T) {
+	cfg := &Config{}
+	cfg.applyDefaults()
+
+	got := cfg.PlanPathForBranch("feature/auth-flow")
+	want := ".ralph/plans/IMPLEMENTATION_PLAN_feature-auth-flow.md"
+	if got != want {
+		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
+	}
+}
+
+func TestPlanPathForBranch_CustomFile(t *testing.T) {
+	cfg := &Config{
+		Phases: Phases{
+			Plan: PhaseConfig{Output: "my-plan.md"},
+		},
+	}
+
+	got := cfg.PlanPathForBranch("feat/login")
+	want := "my-plan_feat-login.md"
+	if got != want {
+		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
+	}
+}
+
+func TestPlanPathForBranch_CustomDir(t *testing.T) {
+	cfg := &Config{
+		Phases: Phases{
+			Plan: PhaseConfig{Output: "plans/"},
+		},
+	}
+
+	got := cfg.PlanPathForBranch("fix/bug-123")
+	want := "plans/IMPLEMENTATION_PLAN_fix-bug-123.md"
+	if got != want {
+		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
+	}
+}
+
 func writeConfig(t *testing.T, dir, content string) {
 	t.Helper()
 	configDir := filepath.Join(dir, ".ralph")

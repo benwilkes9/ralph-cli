@@ -1,6 +1,7 @@
 package loop
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -33,6 +34,8 @@ type Options struct {
 	LogsDir       string
 	Branch        string
 	StateFile     string
+	PlanFile      string
+	SpecsDir      string
 }
 
 // Run executes the main iteration loop.
@@ -78,7 +81,7 @@ func Run(ctx context.Context, opts *Options, w io.Writer) error {
 			return fmt.Errorf("creating log writer: %w", err)
 		}
 
-		iterStats, runErr := runClaude(ctx, opts.PromptFile, logW, w)
+		iterStats, runErr := runClaude(ctx, opts, logW, w)
 		logW.Close() //nolint:errcheck // best-effort log close
 		logPaths = append(logPaths, logW.Path())
 
@@ -178,18 +181,25 @@ func claudeArgs() []string {
 }
 
 // runClaude invokes the claude CLI, tees output to the log writer, and returns iteration stats.
-func runClaude(ctx context.Context, promptPath string, logW *logfile.Writer, displayW io.Writer) (*stream.IterationStats, error) {
+func runClaude(ctx context.Context, opts *Options, logW *logfile.Writer, displayW io.Writer) (*stream.IterationStats, error) {
 	args := claudeArgs()
 
 	cmd := exec.CommandContext(ctx, "claude", args...) //nolint:gosec // args are static
 
-	promptFile, err := os.Open(promptPath)
+	promptContent, err := os.ReadFile(opts.PromptFile)
 	if err != nil {
-		return nil, fmt.Errorf("opening prompt file: %w", err)
+		return nil, fmt.Errorf("reading prompt file: %w", err)
 	}
-	defer promptFile.Close() //nolint:errcheck // read-only file
 
-	cmd.Stdin = promptFile
+	// Prepend dynamic context so Claude knows the branch-specific paths.
+	var header bytes.Buffer
+	fmt.Fprintf(&header, "PLAN_FILE: %s\n", opts.PlanFile)
+	fmt.Fprintf(&header, "SPECS_DIR: %s\n", opts.SpecsDir)
+	fmt.Fprintf(&header, "BRANCH: %s\n", opts.Branch)
+	header.WriteString("---\n")
+
+	combined := append(header.Bytes(), promptContent...)
+	cmd.Stdin = bytes.NewReader(combined)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

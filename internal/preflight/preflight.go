@@ -9,8 +9,8 @@ import (
 )
 
 // Check runs pre-flight validation before launching Docker. It verifies that
-// .ralph/ scaffold files exist on disk, auto-commits them if needed, and
-// pushes the branch to the remote.
+// .ralph/ scaffold files exist on disk, auto-commits them if needed, ensures
+// the specs and plans directories are tracked, and pushes the branch to the remote.
 func Check(branch string) error {
 	repoRoot, err := git.RepoRoot()
 	if err != nil {
@@ -38,6 +38,27 @@ func Check(branch string) error {
 		}
 		if err := git.Commit("chore: scaffold ralph"); err != nil {
 			return fmt.Errorf("preflight: git commit: %w", err)
+		}
+	}
+
+	// 2b. Auto-commit specs dir and plans dir if present but untracked.
+	for _, dir := range []string{"specs", ".ralph/plans"} {
+		dirPath := filepath.Join(repoRoot, dir)
+		if _, statErr := os.Stat(dirPath); os.IsNotExist(statErr) {
+			continue
+		}
+		dirTracked, trackErr := git.IsTracked(filepath.Join(dir, ".gitkeep"))
+		if trackErr != nil {
+			continue // best-effort
+		}
+		if !dirTracked {
+			fmt.Printf("Committing %s/ directory...\n", dir)
+			if addErr := git.Add(dir + "/"); addErr != nil {
+				return fmt.Errorf("preflight: git add %s/: %w", dir, addErr)
+			}
+			if commitErr := git.Commit(fmt.Sprintf("chore: add %s directory", dir)); commitErr != nil {
+				return fmt.Errorf("preflight: git commit: %w", commitErr)
+			}
 		}
 	}
 

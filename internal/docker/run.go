@@ -16,6 +16,8 @@ type RunOptions struct {
 	Branch   string
 	Repo     string
 	LogsDir  string
+	PlanFile string
+	SpecsDir string
 }
 
 // Run executes docker run with the given options, attaching stdin/stdout/stderr.
@@ -27,6 +29,8 @@ func Run(opts *RunOptions) error {
 		"-e", "GITHUB_PAT",
 		"-e", "REPO=" + opts.Repo,
 		"-e", "BRANCH=" + opts.Branch,
+		"-e", "PLAN_FILE=" + opts.PlanFile,
+		"-e", "SPECS_DIR=" + opts.SpecsDir,
 		"-v", opts.LogsDir + ":/app/logs",
 		opts.ImageTag,
 		"--",

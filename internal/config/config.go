@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 // Config holds the ralph project configuration loaded from .ralph/config.yaml.
@@ -95,7 +98,7 @@ func (c *Config) applyDefaults() {
 		c.Phases.Plan.Prompt = ".ralph/prompts/plan.md"
 	}
 	if c.Phases.Plan.Output == "" {
-		c.Phases.Plan.Output = ".ralph/IMPLEMENTATION_PLAN.md"
+		c.Phases.Plan.Output = ".ralph/plans/"
 	}
 	if c.Phases.Plan.MaxIterations == 0 {
 		c.Phases.Plan.MaxIterations = 5
@@ -106,4 +109,23 @@ func (c *Config) applyDefaults() {
 	if c.Phases.Build.MaxIterations == 0 {
 		c.Phases.Build.MaxIterations = 20
 	}
+}
+
+// PlanPathForBranch returns the branch-specific plan file path.
+// If the configured output is a directory (ends with /), the plan file is
+// placed inside it as IMPLEMENTATION_PLAN_{sanitized-branch}.md.
+// If the user set a custom file path, the branch suffix is inserted before
+// the extension.
+func (c *Config) PlanPathForBranch(branch string) string {
+	sanitized := git.SanitizeBranch(branch)
+	output := c.Phases.Plan.Output
+
+	if strings.HasSuffix(output, "/") {
+		return output + "IMPLEMENTATION_PLAN_" + sanitized + ".md"
+	}
+
+	// Custom file path: insert branch before extension.
+	ext := filepath.Ext(output)
+	base := strings.TrimSuffix(output, ext)
+	return base + "_" + sanitized + ext
 }
