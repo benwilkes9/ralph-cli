@@ -41,8 +41,10 @@ Always run this before committing code.
 
 ## CI Pipeline
 
-GitHub Actions runs on every push and PR:
-- golangci-lint, tests with coverage (uploaded to Codecov), build, nilaway, govulncheck, gitleaks
+GitHub Actions runs 3 parallel jobs on every push and PR:
+- **lint** — golangci-lint, nilaway
+- **test** — `go test -race` with coverage (uploaded to Codecov), build
+- **security** — govulncheck, gitleaks
 
 ## Releases
 
@@ -103,7 +105,3 @@ Single line only. No body, no `Co-Authored-By` trailer.
 - Use `fmt.Errorf("context: %w", err)` for error wrapping
 - Version injected via `-ldflags` at build time from git tags
 - Test files live alongside source: `foo_test.go` next to `foo.go`
-
-## Reference
-
-Initial implementation plan: `specs/ralph-cli-plan.md`
