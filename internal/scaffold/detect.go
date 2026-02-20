@@ -5,8 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+// safeVersion matches version strings that are safe to interpolate into shell
+// commands and Dockerfile instructions. Allows alphanumeric, dots, hyphens, and
+// plus signs (e.g. "1.25.7", "3.12", "nightly", "nightly-2024-01-01").
+var safeVersion = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.\-+]*$`)
 
 // Language represents a detected programming language.
 type Language string
@@ -99,27 +105,45 @@ func Detect(repoRoot string) *ProjectInfo {
 }
 
 func detectLanguageVersion(repoRoot string, lang Language) string {
+	var v string
 	switch lang { //nolint:exhaustive // unknown has no version
 	case LangGo:
-		return readGoVersion(filepath.Join(repoRoot, "go.mod"))
+		v = readGoVersion(filepath.Join(repoRoot, "go.mod"))
 	case LangPython:
-		if v := readFirstLine(filepath.Join(repoRoot, ".python-version")); v != "" {
-			return v
+		if fv := readFirstLine(filepath.Join(repoRoot, ".python-version")); fv != "" {
+			v = fv
+		} else {
+			v = "3.12"
 		}
-		return "3.12"
 	case LangNode:
-		if v := readFirstLine(filepath.Join(repoRoot, ".nvmrc")); v != "" {
-			return v
+		if fv := readFirstLine(filepath.Join(repoRoot, ".nvmrc")); fv != "" {
+			v = fv
+		} else {
+			v = "22"
 		}
-		return "22"
 	case LangRust:
-		if v := readFirstLine(filepath.Join(repoRoot, "rust-toolchain")); v != "" {
-			return v
+		if fv := readFirstLine(filepath.Join(repoRoot, "rust-toolchain")); fv != "" {
+			v = fv
+		} else {
+			v = "stable"
 		}
-		return "stable"
 	default:
 		return ""
 	}
+	return sanitizeVersion(v)
+}
+
+// sanitizeVersion returns the version string only if it matches the safe
+// pattern. If the version contains shell metacharacters or other unsafe
+// content, it returns an empty string to prevent injection.
+func sanitizeVersion(v string) string {
+	if v == "" {
+		return ""
+	}
+	if !safeVersion.MatchString(v) {
+		return ""
+	}
+	return v
 }
 
 func applyEcosystemDefaults(info *ProjectInfo) {

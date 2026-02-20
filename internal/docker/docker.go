@@ -10,6 +10,14 @@ import (
 
 var requiredEnvVars = []string{"ANTHROPIC_API_KEY", "GITHUB_PAT"}
 
+// allowedEnvVars is the set of env var names that may be loaded from .env.
+// This prevents a compromised .env file from injecting vars like PATH or
+// LD_PRELOAD into the process environment.
+var allowedEnvVars = map[string]bool{
+	"ANTHROPIC_API_KEY": true,
+	"GITHUB_PAT":        true,
+}
+
 // BuildAndRun orchestrates the full Docker workflow: detect repo, load env,
 // validate, build image, run container, and sync changes back.
 func BuildAndRun(mode string, maxIterations int, branch string) error {
@@ -25,6 +33,9 @@ func BuildAndRun(mode string, maxIterations int, branch string) error {
 	}
 
 	for k, v := range env {
+		if !allowedEnvVars[k] {
+			return fmt.Errorf("disallowed env var in .env: %s (allowed: ANTHROPIC_API_KEY, GITHUB_PAT)", k)
+		}
 		if err := os.Setenv(k, v); err != nil {
 			return fmt.Errorf("setting env %s: %w", k, err)
 		}

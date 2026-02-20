@@ -38,9 +38,21 @@ type PhaseConfig struct {
 	FreshContext  bool   `yaml:"fresh_context,omitempty"`
 }
 
+// maxConfigSize is the maximum config file size we'll read (64 KiB).
+const maxConfigSize = 64 * 1024
+
 // Load reads .ralph/config.yaml from the given repo root.
 func Load(repoRoot string) (*Config, error) {
 	path := filepath.Join(repoRoot, ".ralph", "config.yaml")
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading config: %w", err)
+	}
+	if info.Size() > maxConfigSize {
+		return nil, fmt.Errorf("config file too large: %d bytes (max %d)", info.Size(), maxConfigSize)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
@@ -51,8 +63,28 @@ func Load(repoRoot string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
 	cfg.applyDefaults()
 	return &cfg, nil
+}
+
+func (c *Config) validate() error {
+	if c.Phases.Plan.MaxIterations < 0 {
+		return fmt.Errorf("phases.plan.max_iterations must be non-negative")
+	}
+	if c.Phases.Build.MaxIterations < 0 {
+		return fmt.Errorf("phases.build.max_iterations must be non-negative")
+	}
+	if c.Phases.Plan.MaxIterations > 100 {
+		return fmt.Errorf("phases.plan.max_iterations exceeds maximum (100)")
+	}
+	if c.Phases.Build.MaxIterations > 100 {
+		return fmt.Errorf("phases.build.max_iterations exceeds maximum (100)")
+	}
+	return nil
 }
 
 func (c *Config) applyDefaults() {

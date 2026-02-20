@@ -22,12 +22,14 @@ type RunOptions struct {
 func Run(opts *RunOptions) error {
 	args := []string{
 		"run", "--rm", "-it",
+		"--security-opt", "no-new-privileges",
 		"-e", "ANTHROPIC_API_KEY",
 		"-e", "GITHUB_PAT",
 		"-e", "REPO=" + opts.Repo,
 		"-e", "BRANCH=" + opts.Branch,
 		"-v", opts.LogsDir + ":/app/logs",
 		opts.ImageTag,
+		"--",
 		opts.Mode,
 		strconv.Itoa(opts.MaxIter),
 	}

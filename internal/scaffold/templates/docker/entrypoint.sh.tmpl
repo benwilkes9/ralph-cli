@@ -18,11 +18,16 @@ git config --global user.name "Claude"
 git config --global user.email "noreply@anthropic.com"
 git config --global commit.gpgsign false
 
+# ─── Git credentials (avoid embedding token in URLs) ─────────────
+git config --global credential.helper store
+printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' "$GITHUB_PAT" \
+    | git credential approve
+unset GITHUB_PAT
+
 # ─── Clone repo ──────────────────────────────────────────────────
-CLONE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO}.git"
 cd /workspace/repo
 git init
-git remote add origin "$CLONE_URL"
+git remote add origin "https://github.com/${REPO}.git"
 git fetch origin "$BRANCH"
 git checkout -b "$BRANCH" "origin/$BRANCH"
 

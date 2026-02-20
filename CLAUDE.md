@@ -57,6 +57,15 @@ templates/              — Embedded scaffold templates for ralph init (//go:emb
 - **No Docker SDK** — `docker build` and `docker run` via exec.Command
 - **stream-json format** — Claude's `--output-format=stream-json` produces JSONL; we parse line-by-line with bufio.Scanner + json.Unmarshal
 - **Embedded templates** — scaffold files use Go's `text/template` + `//go:embed`
+- **Env var allowlist** — `.env` loading only permits `ANTHROPIC_API_KEY` and `GITHUB_PAT`; update `allowedEnvVars` in `internal/docker/docker.go` when adding new vars
+- **Version sanitization** — language versions detected from repo files are validated against `safeVersion` regex before template interpolation to prevent shell injection
+
+## Pre-commit Workflow
+
+Before committing, always:
+
+1. Run `go tool lefthook run pre-commit`
+2. Ask the user if they want to run `/security-review` before committing.
 
 ## Commit Convention
 

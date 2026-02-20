@@ -24,3 +24,5 @@ go.work.sum
 Thumbs.db
 
 specs/*.*
+
+.env

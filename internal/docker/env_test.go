@@ -92,6 +92,29 @@ func TestValidateEnv(t *testing.T) {
 	})
 }
 
+func TestAllowedEnvVars(t *testing.T) {
+	t.Run("allowed keys pass", func(t *testing.T) {
+		env := map[string]string{
+			"ANTHROPIC_API_KEY": "sk-test",
+			"GITHUB_PAT":        "ghp_test",
+		}
+		for k := range env {
+			if !allowedEnvVars[k] {
+				t.Errorf("expected %q to be allowed", k)
+			}
+		}
+	})
+
+	t.Run("dangerous keys rejected", func(t *testing.T) {
+		dangerous := []string{"PATH", "LD_PRELOAD", "http_proxy", "HOME"}
+		for _, k := range dangerous {
+			if allowedEnvVars[k] {
+				t.Errorf("expected %q to be disallowed", k)
+			}
+		}
+	})
+}
+
 func writeTemp(t *testing.T, content string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), ".env")
