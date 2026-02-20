@@ -73,6 +73,18 @@ func gitLog(t *testing.T, dir string) string {
 	return string(out)
 }
 
+func gitDiff(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	fullArgs := append([]string{"diff"}, args...)                        //nolint:gocritic // append to separate slice is intentional
+	cmd := exec.CommandContext(context.Background(), "git", fullArgs...) //nolint:gosec // args are test-controlled
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git diff failed: %s", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func chdir(t *testing.T, dir string) {
 	t.Helper()
 	orig, err := os.Getwd()
@@ -222,6 +234,44 @@ func TestCheck_AutoCommitsPlansDir(t *testing.T) {
 	log := gitLog(t, clone)
 	if !strings.Contains(log, "chore: add custom/plans directory") {
 		t.Errorf("expected auto-commit for custom plans dir in log, got:\n%s", log)
+	}
+}
+
+func TestCheck_AutoPushesCustomPlanDir(t *testing.T) {
+	clone := initBareAndClone(t)
+	chdir(t, clone)
+	writeScaffold(t, clone)
+
+	// Commit and push scaffold.
+	runGit(t, clone, "add", ".ralph/")
+	runGit(t, clone, "commit", "-m", "add scaffold")
+	runGit(t, clone, "push", "origin", "main")
+
+	// Create and commit a plan file + .gitkeep in a custom dir outside .ralph/.
+	plansDir := filepath.Join(clone, "plans")
+	if err := os.MkdirAll(plansDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(plansDir, ".gitkeep"), []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	planFile := filepath.Join(plansDir, "IMPLEMENTATION_PLAN_main.md")
+	if err := os.WriteFile(planFile, []byte("# Plan"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, clone, "add", "plans/")
+	runGit(t, clone, "commit", "-m", "add plan")
+
+	// Check should push the custom plans/ dir to origin.
+	err := Check("main", "specs", "plans/IMPLEMENTATION_PLAN_main.md")
+	if err != nil {
+		t.Fatalf("expected no error, got: %s", err)
+	}
+
+	// Verify the plan was pushed — no diff between local and remote.
+	diff := gitDiff(t, clone, "origin/main", "--", "plans/")
+	if diff != "" {
+		t.Errorf("expected custom plan dir to be pushed, but got diff:\n%s", diff)
 	}
 }
 
