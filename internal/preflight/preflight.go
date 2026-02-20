@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
 )
@@ -75,8 +76,12 @@ func Check(branch, specsDir, planFile string) error {
 		return nil
 	}
 
-	// 4. Push any unpushed changes in .ralph/, specs/, or plans.
-	for _, path := range []string{".ralph/", specsDir + "/"} {
+	// 4. Push any unpushed changes in .ralph/, specs dir, or plans dir.
+	pushPaths := []string{".ralph/", specsDir + "/"}
+	if planDir := filepath.Dir(planFile) + "/"; !strings.HasPrefix(planDir, ".ralph/") {
+		pushPaths = append(pushPaths, planDir)
+	}
+	for _, path := range pushPaths {
 		diff, err := git.DiffFromRemote(branch, path)
 		if err != nil {
 			return fmt.Errorf("preflight: checking unpushed changes in %s: %w", path, err)
