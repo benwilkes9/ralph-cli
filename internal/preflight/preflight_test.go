@@ -15,7 +15,7 @@ func initBareAndClone(t *testing.T) string {
 	t.Helper()
 
 	bare := t.TempDir()
-	runGit(t, bare, "init", "--bare")
+	runGit(t, bare, "init", "--bare", "--initial-branch=main")
 
 	clone := t.TempDir()
 	runGitNoDir(t, "clone", bare, clone)
