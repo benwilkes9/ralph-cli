@@ -75,15 +75,18 @@ func Check(branch string) error {
 		return nil
 	}
 
-	// 4. Push any unpushed .ralph/ changes.
-	diff, err := git.DiffFromRemote(branch, ".ralph/")
-	if err != nil {
-		return fmt.Errorf("preflight: checking unpushed changes: %w", err)
-	}
-	if diff != "" {
-		fmt.Println("Pushing .ralph/ changes to origin...")
-		if err := git.Push(branch); err != nil {
-			return fmt.Errorf("preflight: git push: %w", err)
+	// 4. Push any unpushed changes in .ralph/, specs/, or plans.
+	for _, path := range []string{".ralph/", "specs/"} {
+		diff, err := git.DiffFromRemote(branch, path)
+		if err != nil {
+			return fmt.Errorf("preflight: checking unpushed changes in %s: %w", path, err)
+		}
+		if diff != "" {
+			fmt.Printf("Pushing %s changes to origin...\n", path)
+			if err := git.Push(branch); err != nil {
+				return fmt.Errorf("preflight: git push: %w", err)
+			}
+			break // one push sends everything
 		}
 	}
 

@@ -134,12 +134,19 @@ func planCmd() *cobra.Command {
 				return err
 			}
 
-			// Ensure specs and plans directories exist.
-			if err := os.MkdirAll(filepath.Join(p.repoRoot, p.specsDir), 0o750); err != nil {
-				return fmt.Errorf("creating specs dir: %w", err)
-			}
-			if err := os.MkdirAll(filepath.Join(p.repoRoot, filepath.Dir(p.planFile)), 0o750); err != nil {
-				return fmt.Errorf("creating plans dir: %w", err)
+			// Ensure specs and plans directories exist with .gitkeep so
+			// preflight can track and auto-commit them.
+			for _, dir := range []string{p.specsDir, filepath.Dir(p.planFile)} {
+				absDir := filepath.Join(p.repoRoot, dir)
+				if err := os.MkdirAll(absDir, 0o750); err != nil {
+					return fmt.Errorf("creating %s: %w", dir, err)
+				}
+				gitkeep := filepath.Join(absDir, ".gitkeep")
+				if _, err := os.Stat(gitkeep); os.IsNotExist(err) {
+					if err := os.WriteFile(gitkeep, []byte(""), 0o600); err != nil {
+						return fmt.Errorf("creating %s/.gitkeep: %w", dir, err)
+					}
+				}
 			}
 
 			return docker.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)

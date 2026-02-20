@@ -47,6 +47,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.Phases.Build.MaxIterations != 20 {
 		t.Errorf("Build.MaxIterations = %d, want default 20", cfg.Phases.Build.MaxIterations)
 	}
+	if len(cfg.ProtectedBranches) != 2 || cfg.ProtectedBranches[0] != "main" || cfg.ProtectedBranches[1] != "master" {
+		t.Errorf("ProtectedBranches = %v, want [main master]", cfg.ProtectedBranches)
+	}
 }
 
 func TestLoad_NegativeIterations(t *testing.T) {
