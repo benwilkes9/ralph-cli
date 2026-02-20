@@ -16,11 +16,11 @@ RUN npm install -g @anthropic-ai/claude-code@latest
 {{- if eq (str .Language) "go"}}
 COPY --from=golang:{{.LanguageVersion}}-bookworm /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
-RUN go install github.com/benmyles/ralph-cli/cmd/ralph@latest
+RUN go install github.com/benwilkes9/ralph-cli/cmd/ralph@latest
 {{- else}}
 COPY --from=golang:1.25-bookworm /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
-RUN go install github.com/benmyles/ralph-cli/cmd/ralph@latest
+RUN go install github.com/benwilkes9/ralph-cli/cmd/ralph@latest
 {{- end}}
 
 # ═════════════════════════════════════════════════════════════════

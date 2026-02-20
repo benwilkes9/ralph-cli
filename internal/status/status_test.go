@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benmyles/ralph-cli/internal/state"
+	"github.com/benwilkes9/ralph-cli/internal/state"
 )
 
 const samplePlan = `# Implementation Plan

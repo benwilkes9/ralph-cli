@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/benmyles/ralph-cli/internal/git"
+	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 var requiredEnvVars = []string{"ANTHROPIC_API_KEY", "GITHUB_PAT"}

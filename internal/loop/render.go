@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/benmyles/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/stream"
 )
 
 const contextLimit = 200_000

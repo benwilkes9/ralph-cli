@@ -1,4 +1,4 @@
-module github.com/benmyles/ralph-cli
+module github.com/benwilkes9/ralph-cli
 
 go 1.25.7
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="benmyles/ralph-cli"
+REPO="benwilkes9/ralph-cli"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 # Detect OS

@@ -19,8 +19,8 @@ archives:
 
 brews:
   - repository:
-      owner: benmyles
+      owner: benwilkes9
       name: homebrew-tap
     name: ralph
-    homepage: https://github.com/benmyles/ralph-cli
+    homepage: https://github.com/benwilkes9/ralph-cli
     description: Autonomous plan/build iteration using Claude Code

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/benmyles/ralph-cli/internal/git"
+	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 // RepoSlug extracts "owner/repo" from a git remote URL.

@@ -9,19 +9,19 @@ Based on the [Ralph Wiggam loop](https://ghuntley.com/ralph) and the [Ralph Play
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install benmyles/tap/ralph
+brew install benwilkes9/tap/ralph
 ```
 
 ### Curl script
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/benmyles/ralph-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/benwilkes9/ralph-cli/main/install.sh | sh
 ```
 
 ### Go install
 
 ```bash
-go install github.com/benmyles/ralph-cli/cmd/ralph@latest
+go install github.com/benwilkes9/ralph-cli/cmd/ralph@latest
 ```
 
 ## Quick Start

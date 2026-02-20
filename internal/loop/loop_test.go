@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/benmyles/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/stream"
 )
 
 func TestRenderHeader(t *testing.T) {
