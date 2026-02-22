@@ -1,6 +1,6 @@
 # Binaries
 bin/
-ralph
+/ralph
 *.exe
 *.dll
 *.so

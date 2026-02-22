@@ -30,9 +30,10 @@ func main() {
 		SilenceUsage: true,
 	}
 
+	orch := realOrchestrator{}
 	root.AddCommand(initCmd())
-	root.AddCommand(planCmd())
-	root.AddCommand(applyCmd())
+	root.AddCommand(planCmd(orch))
+	root.AddCommand(applyCmd(orch))
 	root.AddCommand(statusCmd())
 	root.AddCommand(loopCmd())
 
@@ -46,7 +47,7 @@ func initCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold .ralph/ in current repo",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			repoRoot, err := git.RepoRoot()
 			if err != nil {
 				return fmt.Errorf("finding repo root: %w", err)
@@ -54,9 +55,11 @@ func initCmd() *cobra.Command {
 
 			info := scaffold.Detect(repoRoot)
 
+			_, isTerminal := cmd.InOrStdin().(*os.File)
 			if err := scaffold.RunPrompts(info, &scaffold.PromptOptions{
-				In:  os.Stdin,
-				Out: os.Stdout,
+				In:         cmd.InOrStdin(),
+				Out:        cmd.OutOrStdout(),
+				Accessible: !isTerminal,
 			}); err != nil {
 				return fmt.Errorf("running prompts: %w", err)
 			}
@@ -66,7 +69,7 @@ func initCmd() *cobra.Command {
 				return fmt.Errorf("generating scaffold: %w", err)
 			}
 
-			scaffold.PrintSummary(os.Stdout, result)
+			scaffold.PrintSummary(cmd.OutOrStdout(), result)
 			return nil
 		},
 	}
@@ -83,6 +86,18 @@ func validateRelativePath(flag, path string) error {
 		return fmt.Errorf("--%s must stay within the repository root, got %q", flag, path)
 	}
 	return nil
+}
+
+// Orchestrator abstracts the docker plan/build workflow so planCmd and applyCmd
+// can be tested without a real Docker daemon.
+type Orchestrator interface {
+	BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error
+}
+
+type realOrchestrator struct{}
+
+func (r realOrchestrator) BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error {
+	return docker.BuildAndRun(mode, maxIter, branch, planFile, specsDir) //nolint:wrapcheck // thin adapter
 }
 
 // runParams holds resolved parameters shared by planCmd and applyCmd.
@@ -143,7 +158,7 @@ func resolveRunParams(cmd *cobra.Command) (*runParams, error) {
 	}, nil
 }
 
-func planCmd() *cobra.Command {
+func planCmd(orch Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan",
 		Short: "Run planning loop (generates branch-specific plan)",
@@ -168,7 +183,7 @@ func planCmd() *cobra.Command {
 				}
 			}
 
-			return docker.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)
+			return orch.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -176,7 +191,7 @@ func planCmd() *cobra.Command {
 	return cmd
 }
 
-func applyCmd() *cobra.Command {
+func applyCmd(orch Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Run build loop (implements tasks one at a time)",
@@ -191,7 +206,7 @@ func applyCmd() *cobra.Command {
 				return fmt.Errorf("plan file %q not found; run \"ralph plan\" first", p.planFile)
 			}
 
-			return docker.BuildAndRun("build", p.maxVal, p.branch, p.planFile, p.specsDir)
+			return orch.BuildAndRun("build", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -203,7 +218,7 @@ func statusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Progress summary — tasks done, costs, pass/fail",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			repoRoot, err := git.RepoRoot()
 			if err != nil {
 				return fmt.Errorf("finding repo root: %w", err)
@@ -236,7 +251,7 @@ func statusCmd() *cobra.Command {
 				return fmt.Errorf("loading state: %w", err)
 			}
 
-			status.Render(os.Stdout, cfg.Project, branch, tasks, runs, st.LastRun())
+			status.Render(cmd.OutOrStdout(), cfg.Project, branch, tasks, runs, st.LastRun())
 			return nil
 		},
 	}
