@@ -64,6 +64,7 @@ type ProjectInfo struct {
 	LanguageVersion string
 	PackageManager  PackageManager
 
+	SpecsDir            string   // base directory for specs, e.g. "specs"
 	DepsDir             string   // "node_modules", ".venv", "target", ""
 	ExtraAllowedDomains []string // ecosystem-specific package registry domains
 
@@ -103,6 +104,7 @@ func Detect(repoRoot string) *ProjectInfo {
 		ProjectName:    filepath.Base(repoRoot),
 		Language:       LangUnknown,
 		PackageManager: PmUnknown,
+		SpecsDir:       "specs",
 		BaseImage:      "node:22-bookworm",
 	}
 

@@ -167,15 +167,33 @@ func TestInitCmd_NotInGitRepo(t *testing.T) {
 	assert.Contains(t, err.Error(), "finding repo root")
 }
 
+func TestInitCmd_RejectsProtectedBranch(t *testing.T) {
+	dir := t.TempDir()
+	testutil.RunGit(t, dir, "init", "--initial-branch=main")
+	testutil.RunGit(t, dir, "config", "user.name", "test")
+	testutil.RunGit(t, dir, "config", "user.email", "test@test.com")
+	testutil.RunGit(t, dir, "config", "commit.gpgsign", "false")
+	testutil.RunGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	testutil.Chdir(t, dir)
+
+	cmd := initCmd()
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "feature branch")
+}
+
 func TestInitCmd_CreatesScaffold(t *testing.T) {
 	dir := t.TempDir()
 	testutil.RunGit(t, dir, "init", "--initial-branch=main")
 	testutil.RunGit(t, dir, "config", "user.name", "test")
 	testutil.RunGit(t, dir, "config", "user.email", "test@test.com")
+	testutil.RunGit(t, dir, "config", "commit.gpgsign", "false")
+	testutil.RunGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	testutil.RunGit(t, dir, "checkout", "-b", "my-feature")
 	testutil.Chdir(t, dir)
 
 	cmd := initCmd()
-	cmd.SetIn(&byteReader{strings.NewReader("1\n1\n")})
+	cmd.SetIn(&byteReader{strings.NewReader("1\n1\n1\n")})
 	cmd.SetOut(&bytes.Buffer{})
 
 	require.NoError(t, cmd.Execute())
@@ -184,8 +202,25 @@ func TestInitCmd_CreatesScaffold(t *testing.T) {
 
 // --- planCmd ---
 
+func TestPlanCmd_EmptySpecsDir(t *testing.T) {
+	dir := initRepoWithConfig(t)
+	testutil.Chdir(t, dir)
+
+	fake := &fakeOrchestrator{}
+	cmd := planCmd(fake)
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no .md specs found")
+	assert.Empty(t, fake.calls)
+}
+
 func TestPlanCmd_CreatesDirectoriesAndCallsOrchestrator(t *testing.T) {
 	dir := initRepoWithConfig(t)
+	// Add a spec so the plan command proceeds.
+	specsDir := filepath.Join(dir, "specs", "feature-test")
+	require.NoError(t, os.MkdirAll(specsDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(specsDir, "feature.md"), []byte("# Spec"), 0o600))
 	testutil.Chdir(t, dir)
 
 	fake := &fakeOrchestrator{}

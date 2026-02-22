@@ -25,6 +25,18 @@ func gitLog(t *testing.T, dir string) string {
 	return string(out)
 }
 
+func gitShow(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	fullArgs := append([]string{"show"}, args...)                        //nolint:gocritic // append to separate slice is intentional
+	cmd := exec.CommandContext(context.Background(), "git", fullArgs...) //nolint:gosec // args are test-controlled
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git show failed: %s", err)
+	}
+	return string(out)
+}
+
 func gitDiff(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	fullArgs := append([]string{"diff"}, args...)                        //nolint:gocritic // append to separate slice is intentional
@@ -42,6 +54,9 @@ func writeScaffold(t *testing.T, dir string) {
 	ralphDir := filepath.Join(dir, ".ralph")
 	require.NoError(t, os.MkdirAll(ralphDir, 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(ralphDir, "config.yaml"), []byte("project: test"), 0o600))
+	// Root-level files also created by ralph init.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# Agents"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.example"), []byte("ANTHROPIC_API_KEY="), 0o600))
 }
 
 func TestCheck_ConfigMissing(t *testing.T) {
@@ -61,9 +76,37 @@ func TestCheck_AutoCommitsUntracked(t *testing.T) {
 	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
 	require.NoError(t, err)
 
-	// Verify .ralph/ was committed.
+	// Verify all scaffold files were committed in a single commit.
 	log := gitLog(t, clone)
 	assert.Contains(t, log, "chore: scaffold ralph")
+
+	// Verify root-level files were included in the commit.
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "AGENTS.md")
+	assert.Contains(t, show, ".env.example")
+	assert.Contains(t, show, ".ralph/config.yaml")
+}
+
+func TestCheck_AutoCommitsRootFilesWhenRalphAlreadyTracked(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
+	writeScaffold(t, clone)
+
+	// Simulate a previous run that only committed .ralph/ but missed root files.
+	testutil.RunGit(t, clone, "add", ".ralph/")
+	testutil.RunGit(t, clone, "commit", "-m", "add scaffold (partial)")
+	testutil.RunGit(t, clone, "push", "origin", "main")
+
+	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
+	require.NoError(t, err)
+
+	// Verify root-level files were committed in a follow-up scaffold commit.
+	log := gitLog(t, clone)
+	assert.Contains(t, log, "chore: scaffold ralph")
+
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "AGENTS.md")
+	assert.Contains(t, show, ".env.example")
 }
 
 func TestCheck_AutoPushesBranch(t *testing.T) {

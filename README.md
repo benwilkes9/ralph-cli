@@ -27,21 +27,23 @@ go install github.com/benwilkes9/ralph-cli/cmd/ralph@latest
 ## Quick Start
 
 ```bash
-# 1. Scaffold .ralph/ in your repo
+# 1. Create a feature branch (init/plan/apply won't run on main or master)
+git checkout -b my-feature
+
+# 2. Scaffold .ralph/ — interactive prompts will ask about your project
 ralph init
 
-# 2. Add your API keys
+# 3. Add your API keys
 cp .env.example .env
 # Set ANTHROPIC_API_KEY and GITHUB_PAT in .env
 
-# 3. Create a feature branch (plan/apply won't run on main or master)
-git checkout -b my-feature
-
-# 4. Ensure your specs are in your feature folder
+# 4. Add at least one .md spec to your specs directory
+#    (ralph init creates this for you based on your branch)
 specs/my-feature/my-spec-1.md
 specs/my-feature/my-spec-2.md
 
 # 5. Run planning loop (generates .ralph/plans/IMPLEMENTATION_PLAN_my-feature.md)
+#    Scaffold files are auto-committed on first run
 ralph plan
 
 # 6. Run build loop (reads from the implementation plan, implements tasks one at a time)
@@ -74,18 +76,21 @@ I think of all this as an implementation of the [four foundational agentic patte
 
 Ralph is branch-aware — plans and specs are isolated per branch so parallel features don't collide:
 
+- **All commands** (`init`, `plan`, `apply`) **must be run on a feature branch** — they'll error on `main` or `master`
+- **Specs directory** is chosen during `ralph init` (default: `specs/`), with the branch appended automatically (e.g. `specs/my-feature/`). Overridable per-run with `--specs`
 - **Plans** are stored at `.ralph/plans/IMPLEMENTATION_PLAN_{branch}.md` (e.g. `IMPLEMENTATION_PLAN_my-feature.md`)
-- **Specs** default to `specs/{branch}/` (e.g. `specs/my-feature/`), overridable with `--specs`
-- `ralph plan` and `ralph apply` **must be run on a feature branch** — they'll error on `main` or `master`
+- `ralph plan` **requires at least one `.md` spec** in the specs directory before it will run
+- `ralph apply` **requires an implementation plan** — run `ralph plan` first
 - `ralph status` automatically reads the plan for your current branch
+- **Auto-commit** — scaffold files (`.ralph/`, `AGENTS.md`, `.env.example`, `.gitignore`) are auto-committed on the first `ralph plan` run if not already tracked
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `ralph init` | Scaffold `.ralph/` in current repo |
-| `ralph plan` | Run planning loop (generates implementation plan) |
-| `ralph apply` | Run build loop (implements tasks one at a time) |
+| `ralph init` | Scaffold `.ralph/` in current repo (must be on a feature branch) |
+| `ralph plan` | Run planning loop (generates implementation plan from specs) |
+| `ralph apply` | Run build loop (implements tasks from the plan one at a time) |
 | `ralph status` | Progress summary — tasks done, costs, pass/fail |
 
 ### Flags
@@ -134,7 +139,7 @@ If the agent corrupts workspace files, use `git checkout` or `git stash` to reco
 
 ## Configuration
 
-After `ralph init`, edit `.ralph/config.yaml` to configure:
+`ralph init` detects your project ecosystem and asks interactive questions about your run command, project goal, and specs directory. The generated `.ralph/config.yaml` can be further customised:
 
 - Project name and agent
 - Backpressure commands (test, typecheck, lint)
@@ -154,8 +159,6 @@ network:
 docker:
   deps_dir: .venv
 ```
-
-See `ralph init` output for file locations.
 
 ## Development
 

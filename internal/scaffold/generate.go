@@ -33,6 +33,21 @@ var templateMapping = []struct {
 	{"templates/env.example.tmpl", ".env.example"},
 }
 
+// RootFiles returns output paths from the template mapping that live outside
+// .ralph/ (e.g. "AGENTS.md", ".env.example"). Preflight uses this to stage
+// all init-generated files without hardcoding paths.
+func RootFiles() []string {
+	var roots []string
+	for _, m := range templateMapping {
+		if !strings.HasPrefix(m.output, ".ralph/") {
+			roots = append(roots, m.output)
+		}
+	}
+	// .gitignore is appended by init, not from a template mapping entry.
+	roots = append(roots, ".gitignore")
+	return roots
+}
+
 // gitignoreEntries are lines to append to .gitignore idempotently.
 var gitignoreEntries = []string{
 	".ralph/logs/",
@@ -42,12 +57,15 @@ var gitignoreEntries = []string{
 
 // GenerateResult tracks which files were created or skipped.
 type GenerateResult struct {
-	Created []string
-	Skipped []string
+	Created  []string
+	Skipped  []string
+	SpecsDir string // resolved specs directory including branch (e.g. "specs/my-feature")
 }
 
 // Generate renders all templates into the repo, skipping existing files.
-func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
+// branch is the current git branch used to resolve the specs directory;
+// if empty, the base SpecsDir is used as-is.
+func Generate(repoRoot, branch string, info *ProjectInfo) (*GenerateResult, error) {
 	result := &GenerateResult{}
 
 	for _, mapping := range templateMapping {
@@ -86,12 +104,18 @@ func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
 		result.Created = append(result.Created, mapping.output)
 	}
 
-	// Create .gitkeep files for specs/ and .ralph/plans/ directories.
+	specsDir := info.SpecsDir
+	if branch != "" {
+		specsDir = info.SpecsDir + "/" + branch
+	}
+	result.SpecsDir = specsDir
+
+	// Create .gitkeep files for specs and .ralph/plans/ directories.
 	for _, dir := range []struct {
 		path    string
 		display string
 	}{
-		{filepath.Join(repoRoot, "specs"), "specs/.gitkeep"},
+		{filepath.Join(repoRoot, specsDir), specsDir + "/.gitkeep"},
 		{filepath.Join(repoRoot, ".ralph", "plans"), ".ralph/plans/.gitkeep"},
 	} {
 		gk := filepath.Join(dir.path, ".gitkeep")
@@ -192,12 +216,10 @@ func PrintSummary(w io.Writer, result *GenerateResult) {
 	}
 	printLine(w, "")
 	printLine(w, "Next steps:")
-	printLine(w, "  1. Edit .env with your API keys - see .env.example for reference")
-	printLine(w, "  2. Review .ralph/config.yaml")
-	printLine(w, "  3. Review the prompts in .ralph/prompts/")
-	printLine(w, "  4. Review AGENTS.md")
-	printLine(w, "  5. Ensure the requirements are in the specs/ directory")
-	printLine(w, "  6. Run: ralph plan")
+	printLine(w, "  1. Edit .env with your API keys — see .env.example for reference")
+	printLine(w, "  2. Review .ralph/config.yaml and .ralph/prompts/")
+	printLine(w, fmt.Sprintf("  3. Add your specs to %s/", result.SpecsDir))
+	printLine(w, "  4. Run: ralph plan (scaffold files will be auto-committed)")
 }
 
 func printLine(w io.Writer, s string) {

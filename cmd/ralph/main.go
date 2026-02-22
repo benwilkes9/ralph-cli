@@ -24,10 +24,11 @@ var version = "dev"
 
 func main() {
 	root := &cobra.Command{
-		Use:          "ralph",
-		Short:        "Autonomous plan/build iteration using Claude Code",
-		Version:      version,
-		SilenceUsage: true,
+		Use:           "ralph",
+		Short:         "Autonomous plan/build iteration using Claude Code",
+		Version:       version,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	orch := realOrchestrator{}
@@ -53,6 +54,14 @@ func initCmd() *cobra.Command {
 				return fmt.Errorf("finding repo root: %w", err)
 			}
 
+			branch, err := git.Branch()
+			if err != nil {
+				return fmt.Errorf("getting current branch: %w", err)
+			}
+			if git.IsProtectedBranch(branch, []string{"main", "master"}) {
+				return fmt.Errorf("ralph init must be run on a feature branch, not %q — create one first: git checkout -b my-feature", branch)
+			}
+
 			info := scaffold.Detect(repoRoot)
 
 			_, isTerminal := cmd.InOrStdin().(*os.File)
@@ -60,11 +69,12 @@ func initCmd() *cobra.Command {
 				In:         cmd.InOrStdin(),
 				Out:        cmd.OutOrStdout(),
 				Accessible: !isTerminal,
+				Branch:     branch,
 			}); err != nil {
 				return fmt.Errorf("running prompts: %w", err)
 			}
 
-			result, err := scaffold.Generate(repoRoot, info)
+			result, err := scaffold.Generate(repoRoot, branch, info)
 			if err != nil {
 				return fmt.Errorf("generating scaffold: %w", err)
 			}
@@ -181,6 +191,23 @@ func planCmd(orch Orchestrator) *cobra.Command {
 						return fmt.Errorf("creating %s/.gitkeep: %w", dir, err)
 					}
 				}
+			}
+
+			// Verify at least one .md spec exists before launching Docker.
+			specsPath := filepath.Join(p.repoRoot, p.specsDir)
+			entries, err := os.ReadDir(specsPath)
+			if err != nil {
+				return fmt.Errorf("reading specs directory %q: %w", p.specsDir, err)
+			}
+			hasSpec := false
+			for _, e := range entries {
+				if !e.IsDir() && filepath.Ext(e.Name()) == ".md" {
+					hasSpec = true
+					break
+				}
+			}
+			if !hasSpec {
+				return fmt.Errorf("no .md specs found in %s/ — add at least one spec before running plan", p.specsDir)
 			}
 
 			return orch.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)

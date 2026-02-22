@@ -97,6 +97,20 @@ func goalOptions(info *ProjectInfo) []huh.Option[string] {
 	return opts
 }
 
+// specsDirOptions returns options for the specs directory location.
+// If branch is non-empty, concrete paths are shown (e.g. specs/my-feature/).
+func specsDirOptions(branch string) []huh.Option[string] {
+	b := "<branch>"
+	if branch != "" {
+		b = branch
+	}
+	return []huh.Option[string]{
+		option("specs", fmt.Sprintf("Specs stored in specs/%s/", b)),
+		option("docs/specs", fmt.Sprintf("Specs stored in docs/specs/%s/", b)),
+		customOption(),
+	}
+}
+
 // runCmdTitle returns a context-aware title for the run command select.
 func runCmdTitle(info *ProjectInfo) string {
 	example := ""

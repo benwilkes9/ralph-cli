@@ -27,6 +27,7 @@ func TestDetect_Python_UV(t *testing.T) {
 	assert.Equal(t, "uv run ruff check", info.LintCmd)
 	assert.Contains(t, info.SourceDirs, "src")
 	assert.Contains(t, info.TestDirs, "tests")
+	assert.Equal(t, "specs", info.SpecsDir)
 }
 
 func TestDetect_Python_Poetry(t *testing.T) {

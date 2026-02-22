@@ -1,7 +1,10 @@
 package scaffold
 
 import (
+	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/huh"
 )
@@ -11,11 +14,12 @@ type PromptOptions struct {
 	In         io.Reader
 	Out        io.Writer
 	Accessible bool
+	Branch     string // current git branch; used to show concrete examples in prompts
 }
 
 // RunPrompts asks the user to confirm or override detected values.
 func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
-	var runChoice, goalChoice string
+	var runChoice, goalChoice, specsChoice string
 
 	form := huh.NewForm(
 		// Group 1: Select run command
@@ -45,6 +49,20 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 				Title("Project goal").
 				Value(&info.Goal),
 		).WithHideFunc(func() bool { return goalChoice != customSentinel }),
+
+		// Group 5: Select specs directory
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Where will your specs live? (stored as <dir>/<branch>/)").
+				Options(specsDirOptions(opts.Branch)...).
+				Value(&specsChoice),
+		),
+		// Group 6: Custom specs dir (shown only if "Type something." selected)
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Specs directory").
+				Value(&info.SpecsDir),
+		).WithHideFunc(func() bool { return specsChoice != customSentinel }),
 	).WithAccessible(opts.Accessible)
 
 	if opts.In != nil {
@@ -64,6 +82,25 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 	if goalChoice != customSentinel {
 		info.Goal = goalChoice
 	}
+	if specsChoice != customSentinel {
+		info.SpecsDir = specsChoice
+	}
 
+	if err := validateSpecsDir(info.SpecsDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateSpecsDir rejects absolute paths and paths that escape the repo root.
+func validateSpecsDir(dir string) error {
+	if filepath.IsAbs(dir) {
+		return fmt.Errorf("specs directory must be a relative path, got %q", dir)
+	}
+	clean := filepath.Clean(dir)
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("specs directory must stay within the repository, got %q", dir)
+	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
+	"github.com/benwilkes9/ralph-cli/internal/scaffold"
 )
 
 // Check runs pre-flight validation before launching Docker. It verifies that
@@ -26,15 +27,35 @@ func Check(branch, specsDir, planFile string) error {
 		return fmt.Errorf("preflight: checking config: %w", err)
 	}
 
-	// 2. Auto-commit .ralph/ if not tracked.
-	tracked, err := git.IsTracked(".ralph/config.yaml")
+	// 2. Auto-commit scaffold files that are not yet tracked.
+	//    .ralph/ and root-level files (AGENTS.md, .env.example, .gitignore)
+	//    may have been created at different times, so check each individually.
+	var untracked []string
+	ralphTracked, err := git.IsTracked(".ralph/config.yaml")
 	if err != nil {
 		return fmt.Errorf("preflight: checking git tracking: %w", err)
 	}
-	if !tracked {
-		fmt.Println("Committing .ralph/ scaffold files...")
-		if err := git.Add(".ralph/"); err != nil {
-			return fmt.Errorf("preflight: git add .ralph/: %w", err)
+	if !ralphTracked {
+		untracked = append(untracked, ".ralph/")
+	}
+	for _, f := range scaffold.RootFiles() {
+		if _, statErr := os.Stat(filepath.Join(repoRoot, f)); statErr != nil {
+			continue // file doesn't exist on disk
+		}
+		fTracked, trackErr := git.IsTracked(f)
+		if trackErr != nil {
+			return fmt.Errorf("preflight: checking git tracking for %s: %w", f, trackErr)
+		}
+		if !fTracked {
+			untracked = append(untracked, f)
+		}
+	}
+	if len(untracked) > 0 {
+		fmt.Println("Committing scaffold files...")
+		for _, p := range untracked {
+			if err := git.Add(p); err != nil {
+				return fmt.Errorf("preflight: git add %s: %w", p, err)
+			}
 		}
 		if err := git.Commit("chore: scaffold ralph"); err != nil {
 			return fmt.Errorf("preflight: git commit: %w", err)

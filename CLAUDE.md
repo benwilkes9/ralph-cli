@@ -7,9 +7,9 @@ Ralph CLI — a Go CLI that orchestrates autonomous plan/build iteration loops u
 ## Commands
 
 ```bash
-ralph init    # Scaffold .ralph/ in current repo
-ralph plan    # Run planning loop (generates .ralph/IMPLEMENTATION_PLAN.md)
-ralph apply   # Run build loop (implements tasks one at a time)
+ralph init    # Scaffold .ralph/ in current repo (must be on a feature branch)
+ralph plan    # Run planning loop (generates implementation plan from specs)
+ralph apply   # Run build loop (implements tasks from the plan one at a time)
 ralph status  # Progress summary — tasks done, costs, pass/fail
 ```
 
