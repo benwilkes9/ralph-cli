@@ -5,7 +5,6 @@ set -euo pipefail
 missing=()
 [ -z "${ANTHROPIC_API_KEY:-}" ] && missing+=("ANTHROPIC_API_KEY")
 [ -z "${GITHUB_PAT:-}" ]       && missing+=("GITHUB_PAT")
-[ -z "${REPO:-}" ]             && missing+=("REPO")
 [ -z "${BRANCH:-}" ]           && missing+=("BRANCH")
 
 if [ ${#missing[@]} -gt 0 ]; then
@@ -20,26 +19,45 @@ git config --global commit.gpgsign false
 
 # ─── Git credentials (avoid embedding token in URLs) ─────────────
 git config --global credential.helper store
-printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' "$GITHUB_PAT" \
-    | git credential approve
+printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' \
+    "$GITHUB_PAT" | git credential approve
 unset GITHUB_PAT
 
-# ─── Clone repo ──────────────────────────────────────────────────
-cd /workspace/repo
-git init
-git remote add origin "https://github.com/${REPO}.git"
-if ! git fetch origin "$BRANCH" 2>/dev/null; then
-    echo "Error: branch '$BRANCH' not found on remote '${REPO}'." >&2
-    echo "Push it first:  git push -u origin $BRANCH" >&2
-    exit 1
+# ─── Network firewall (runs as root) ─────────────────────────────
+if [ -n "${ALLOWED_DOMAINS:-}" ]; then
+    echo "Configuring network firewall..."
+
+    iptables -F OUTPUT 2>/dev/null || true
+
+    iptables -A OUTPUT -o lo -j ACCEPT
+    iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    # Only allow DNS to the container's configured resolver(s), not arbitrary IPs.
+    while IFS= read -r ns; do
+        iptables -A OUTPUT -d "$ns" -p udp --dport 53 -j ACCEPT
+        iptables -A OUTPUT -d "$ns" -p tcp --dport 53 -j ACCEPT
+    done < <(awk '/^nameserver/{print $2}' /etc/resolv.conf)
+
+    IFS=',' read -ra DOMAINS <<< "$ALLOWED_DOMAINS"
+    for domain in "${DOMAINS[@]}"; do
+        domain=$(echo "$domain" | xargs)
+        ips=$(getent ahostsv4 "$domain" 2>/dev/null \
+            | awk '{print $1}' | sort -u || true)
+        if [ -z "$ips" ]; then
+            echo "  Warning: could not resolve $domain" >&2
+            continue
+        fi
+        for ip in $ips; do
+            iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
+            iptables -A OUTPUT -d "$ip" -p tcp --dport 80 -j ACCEPT
+        done
+    done
+
+    iptables -A OUTPUT -j DROP
+    unset ALLOWED_DOMAINS
+    echo "Firewall configured."
 fi
-git checkout -b "$BRANCH" "origin/$BRANCH"
 
-# ─── Install project dependencies ───────────────────────────────
-{{.InstallCmd}}
-
-# ─── Claude Code settings ────────────────────────────────────────
+# ─── Drop to non-root user, install deps, and run ────────────────
+cd /workspace/repo
 export DISABLE_AUTOUPDATER=1
-
-# ─── Hand off to ralph loop ──────────────────────────────────────
-exec ralph _loop "$@"
+exec runuser -u claude -- bash -c '{{.InstallCmd}} && exec ralph _loop "$@"' -- "$@"

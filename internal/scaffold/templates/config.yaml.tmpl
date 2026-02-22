@@ -18,3 +18,13 @@ phases:
   build:
     prompt: .ralph/prompts/build.md
     max_iterations: 20
+{{- if .DepsDir}}
+
+docker:
+  deps_dir: "{{.DepsDir}}"
+{{- end}}
+
+# network:
+#   extra_allowed_domains:
+#     - pypi.org
+#     - files.pythonhosted.org

@@ -17,6 +17,8 @@ type Config struct {
 	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
 	Backpressure      Backpressure `yaml:"backpressure"`
 	Phases            Phases       `yaml:"phases"`
+	Network           Network      `yaml:"network,omitempty"`
+	Docker            Docker       `yaml:"docker,omitempty"`
 }
 
 // Backpressure defines the commands used to validate code quality between iterations.
@@ -24,6 +26,16 @@ type Backpressure struct {
 	Test      string `yaml:"test"`
 	Typecheck string `yaml:"typecheck"`
 	Lint      string `yaml:"lint"`
+}
+
+// Network holds network isolation settings for the Docker container.
+type Network struct {
+	ExtraAllowedDomains []string `yaml:"extra_allowed_domains,omitempty"`
+}
+
+// Docker holds Docker-specific settings.
+type Docker struct {
+	DepsDir string `yaml:"deps_dir,omitempty"` // relative to project root, e.g. "node_modules"
 }
 
 // Phases groups the plan and build phase configurations.
@@ -86,6 +98,15 @@ func (c *Config) validate() error {
 	if c.Phases.Build.MaxIterations > 100 {
 		return fmt.Errorf("phases.build.max_iterations exceeds maximum (100)")
 	}
+
+	if c.Docker.DepsDir != "" {
+		clean := filepath.Clean(c.Docker.DepsDir)
+		if filepath.IsAbs(clean) || clean == "." || clean == ".." ||
+			strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("docker.deps_dir must be a relative path within the project, got %q", c.Docker.DepsDir)
+		}
+	}
+
 	return nil
 }
 

@@ -41,12 +41,21 @@ const (
 	PmUnknown PackageManager = "unknown"
 )
 
+// Dependency directory names used as DepsDir values.
+const (
+	depsNodeModules = "node_modules"
+	depsVenv        = ".venv"
+	depsTarget      = "target"
+)
+
 // ProjectInfo holds detected and user-provided project metadata used to render templates.
 type ProjectInfo struct {
 	ProjectName     string
 	Language        Language
 	LanguageVersion string
 	PackageManager  PackageManager
+
+	DepsDir string // "node_modules", ".venv", "target", ""
 
 	InstallCmd   string
 	TestCmd      string
@@ -153,36 +162,43 @@ func applyEcosystemDefaults(info *ProjectInfo) {
 		info.TestCmd = "uv run pytest"
 		info.TypecheckCmd = "uv run pyright"
 		info.LintCmd = "uv run ruff check"
+		info.DepsDir = depsVenv
 	case PmPoetry:
 		info.InstallCmd = "poetry install"
 		info.TestCmd = "poetry run pytest"
 		info.TypecheckCmd = "poetry run pyright"
 		info.LintCmd = "poetry run ruff check"
+		info.DepsDir = depsVenv
 	case PmNPM:
 		info.InstallCmd = "npm install"
 		info.TestCmd = "npm test"
 		info.TypecheckCmd = "npx tsc --noEmit"
 		info.LintCmd = "npm run lint"
+		info.DepsDir = depsNodeModules
 	case PmYarn:
 		info.InstallCmd = "yarn install"
 		info.TestCmd = "yarn test"
 		info.TypecheckCmd = "yarn tsc --noEmit"
 		info.LintCmd = "yarn lint"
+		info.DepsDir = depsNodeModules
 	case PmPNPM:
 		info.InstallCmd = "pnpm install"
 		info.TestCmd = "pnpm test"
 		info.TypecheckCmd = "pnpm tsc --noEmit"
 		info.LintCmd = "pnpm lint"
+		info.DepsDir = depsNodeModules
 	case PmGo:
 		info.InstallCmd = "go mod download"
 		info.TestCmd = "go test ./..."
 		info.TypecheckCmd = ""
 		info.LintCmd = "golangci-lint run ./..."
+		// Go module cache is outside project dir — no DepsDir needed
 	case PmCargo:
 		info.InstallCmd = "cargo build"
 		info.TestCmd = "cargo test"
 		info.TypecheckCmd = ""
 		info.LintCmd = "cargo clippy"
+		info.DepsDir = depsTarget
 	}
 }
 

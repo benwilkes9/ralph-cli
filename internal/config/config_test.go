@@ -90,6 +90,84 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestLoad_NetworkExtraAllowedDomains(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+network:
+  extra_allowed_domains:
+    - pypi.org
+    - files.pythonhosted.org
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"pypi.org", "files.pythonhosted.org"}, cfg.Network.ExtraAllowedDomains)
+}
+
+func TestLoad_DockerDepsDir(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+docker:
+  deps_dir: node_modules
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "node_modules", cfg.Docker.DepsDir)
+}
+
+func TestLoad_DepsDirTraversal(t *testing.T) {
+	tests := []struct {
+		depsDir string
+		wantErr bool
+	}{
+		{"node_modules", false},
+		{".venv", false},
+		{"target", false},
+		{"", false},
+		{"../../etc", true},
+		{"/etc", true},
+		{"../outside", true},
+		{".", true},
+		{"foo/../../bar", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.depsDir, func(t *testing.T) {
+			dir := t.TempDir()
+			yaml := "project: test\n"
+			if tt.depsDir != "" {
+				yaml += "docker:\n  deps_dir: " + tt.depsDir + "\n"
+			}
+			writeConfig(t, dir, yaml)
+
+			_, err := Load(dir)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "docker.deps_dir must be a relative path")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestLoad_BackwardCompat_NoNetworkOrDocker(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+phases:
+  plan:
+    max_iterations: 3
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Network.ExtraAllowedDomains)
+	assert.Empty(t, cfg.Docker.DepsDir)
+}
+
 func TestPlanPathForBranch_DefaultDir(t *testing.T) {
 	cfg := &Config{}
 	cfg.applyDefaults()

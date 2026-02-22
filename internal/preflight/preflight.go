@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
 )
@@ -72,26 +71,6 @@ func Check(branch, specsDir, planFile string) error {
 		fmt.Printf("Pushing branch %q to origin...\n", branch)
 		if err := git.PushSetUpstream(branch); err != nil {
 			return fmt.Errorf("preflight: git push -u origin %s: %w", branch, err)
-		}
-		return nil
-	}
-
-	// 4. Push any unpushed changes in .ralph/, specs dir, or plans dir.
-	pushPaths := []string{".ralph/", specsDir + "/"}
-	if planDir := filepath.Dir(planFile) + "/"; !strings.HasPrefix(planDir, ".ralph/") {
-		pushPaths = append(pushPaths, planDir)
-	}
-	for _, path := range pushPaths {
-		diff, err := git.DiffFromRemote(branch, path)
-		if err != nil {
-			return fmt.Errorf("preflight: checking unpushed changes in %s: %w", path, err)
-		}
-		if diff != "" {
-			fmt.Printf("Pushing %s changes to origin...\n", path)
-			if err := git.Push(branch); err != nil {
-				return fmt.Errorf("preflight: git push: %w", err)
-			}
-			break // one push sends everything
 		}
 	}
 

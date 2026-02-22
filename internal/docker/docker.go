@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/benwilkes9/ralph-cli/internal/git"
+	"github.com/benwilkes9/ralph-cli/internal/config"
 	"github.com/benwilkes9/ralph-cli/internal/preflight"
 )
 
@@ -20,13 +21,12 @@ var allowedEnvVars = map[string]bool{
 }
 
 // BuildAndRun orchestrates the full Docker workflow: detect repo, load env,
-// validate, build image, run container, and sync changes back.
+// validate, build image, run container with bind mount.
 func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir string) error {
 	repo, err := DetectRepo()
 	if err != nil {
 		return fmt.Errorf("detecting repo: %w", err)
 	}
-	fmt.Printf("Repo: %s  Branch: %s\n", repo, branch)
 
 	env, err := LoadEnvFile(".env")
 	if err != nil {
@@ -54,33 +54,38 @@ func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir stri
 		return err
 	}
 
-	logsDir, err := filepath.Abs(".ralph/logs")
+	repoRoot, err := filepath.Abs(".")
 	if err != nil {
-		return fmt.Errorf("resolving logs dir: %w", err)
+		return fmt.Errorf("resolving project dir: %w", err)
 	}
-	if err := os.MkdirAll(logsDir, 0o750); err != nil {
-		return fmt.Errorf("creating logs dir: %w", err)
+
+	cfg, err := config.Load(repoRoot)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
 	}
+
+	allowedDomains := AllowedDomains(cfg.Network.ExtraAllowedDomains)
+
+	fmt.Printf("Repo: %s  Branch: %s\n", repo, branch)
+	fmt.Printf("Mount: %s → /workspace/repo\n", repoRoot)
+	if cfg.Docker.DepsDir != "" {
+		fmt.Printf("Deps volume: ralph-deps-%s → %s\n", cfg.Project, cfg.Docker.DepsDir)
+	}
+	fmt.Printf("Network allowlist: %s\n", strings.Join(allowedDomains, ", "))
+	fmt.Println("Workspace is shared — changes appear on the host in real time.")
 
 	runOpts := &RunOptions{
-		ImageTag: DefaultTag,
-		Mode:     mode,
-		MaxIter:  maxIterations,
-		Branch:   branch,
-		Repo:     repo,
-		LogsDir:  logsDir,
-		PlanFile: planFile,
-		SpecsDir: specsDir,
-	}
-	if err := Run(runOpts); err != nil {
-		return err
+		ImageTag:       DefaultTag,
+		Mode:           mode,
+		MaxIter:        maxIterations,
+		Branch:         branch,
+		ProjectDir:     repoRoot,
+		PlanFile:       planFile,
+		SpecsDir:       specsDir,
+		AllowedDomains: allowedDomains,
+		DepsDir:        cfg.Docker.DepsDir,
+		ProjectName:    cfg.Project,
 	}
 
-	fmt.Println("Syncing changes from container...")
-	if err := git.PullRebase(branch); err != nil {
-		return fmt.Errorf("git pull --rebase: %w", err)
-	}
-	fmt.Println("Sync complete.")
-
-	return nil
+	return Run(runOpts)
 }

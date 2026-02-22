@@ -6,7 +6,7 @@ FROM {{.BaseImage}}
 
 # System packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git jq bc curl ca-certificates \
+        git jq bc curl ca-certificates iptables \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Claude Code CLI
@@ -39,9 +39,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 ENV PATH="/root/.cargo/bin:$PATH"
 {{- end}}
 
-# Non-root user
+# Non-root user (entrypoint drops to this user after firewall setup)
 RUN useradd -m -s /bin/bash claude \
-    && mkdir -p /home/claude/.claude /workspace/repo \
+    && mkdir -p /home/claude/.claude /workspace \
     && chown -R claude:claude /home/claude /workspace
 
 # ═════════════════════════════════════════════════════════════════
@@ -51,11 +51,10 @@ RUN useradd -m -s /bin/bash claude \
 COPY --chown=root:claude .ralph/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod 750 /usr/local/bin/entrypoint.sh
 
-USER claude
 WORKDIR /workspace
 {{- if eq (str .Language) "python"}}
 ENV PATH="/home/claude/.local/bin:$PATH"
-RUN uv python install {{.LanguageVersion}}
+RUN runuser -u claude -- uv python install {{.LanguageVersion}}
 {{- else if eq (str .Language) "go"}}
 ENV PATH="/home/claude/go/bin:$PATH"
 {{- end}}

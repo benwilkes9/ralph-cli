@@ -80,7 +80,7 @@ func TestCheck_AutoPushesBranch(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheck_AutoPushesUnpushedChanges(t *testing.T) {
+func TestCheck_UnpushedChanges_NoAutoPush(t *testing.T) {
 	_, clone := testutil.InitBareAndClone(t)
 	testutil.Chdir(t, clone)
 	writeScaffold(t, clone)
@@ -95,8 +95,13 @@ func TestCheck_AutoPushesUnpushedChanges(t *testing.T) {
 	testutil.RunGit(t, clone, "add", ".ralph/")
 	testutil.RunGit(t, clone, "commit", "-m", "update scaffold")
 
+	// Should succeed without pushing (bind mount reads host files directly).
 	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
 	require.NoError(t, err)
+
+	// Verify the unpushed changes are NOT auto-pushed.
+	diff := gitDiff(t, clone, "origin/main", "--", ".ralph/")
+	assert.NotEmpty(t, diff, "expected unpushed changes to remain — preflight should not auto-push")
 }
 
 func TestCheck_AutoCommitsSpecsDir(t *testing.T) {
@@ -143,7 +148,7 @@ func TestCheck_AutoCommitsPlansDir(t *testing.T) {
 	assert.Contains(t, log, "chore: add custom/plans directory")
 }
 
-func TestCheck_AutoPushesCustomPlanDir(t *testing.T) {
+func TestCheck_CustomPlanDir_NoAutoPush(t *testing.T) {
 	_, clone := testutil.InitBareAndClone(t)
 	testutil.Chdir(t, clone)
 	writeScaffold(t, clone)
@@ -162,13 +167,13 @@ func TestCheck_AutoPushesCustomPlanDir(t *testing.T) {
 	testutil.RunGit(t, clone, "add", "plans/")
 	testutil.RunGit(t, clone, "commit", "-m", "add plan")
 
-	// Check should push the custom plans/ dir to origin.
+	// Should succeed without pushing (bind mount reads host files directly).
 	err := Check("main", "specs", "plans/IMPLEMENTATION_PLAN_main.md")
 	require.NoError(t, err)
 
-	// Verify the plan was pushed — no diff between local and remote.
+	// Verify the plan was NOT auto-pushed — diff should still exist.
 	diff := gitDiff(t, clone, "origin/main", "--", "plans/")
-	assert.Empty(t, diff, "expected custom plan dir to be pushed, but got diff:\n%s", diff)
+	assert.NotEmpty(t, diff, "expected unpushed changes to remain — preflight should not auto-push")
 }
 
 func TestCheck_AllClean(t *testing.T) {

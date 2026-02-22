@@ -109,6 +109,39 @@ func TestDetect_Rust(t *testing.T) {
 	assert.Equal(t, "cargo test", info.TestCmd)
 }
 
+func TestDetect_DepsDir_Node(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "package-lock.json", "{}")
+
+	info := Detect(dir)
+	assert.Equal(t, "node_modules", info.DepsDir)
+}
+
+func TestDetect_DepsDir_Python(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "uv.lock", "")
+
+	info := Detect(dir)
+	assert.Equal(t, ".venv", info.DepsDir)
+}
+
+func TestDetect_DepsDir_Rust(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "Cargo.toml", "[package]\nname = \"test\"")
+
+	info := Detect(dir)
+	assert.Equal(t, "target", info.DepsDir)
+}
+
+func TestDetect_DepsDir_Go_Empty(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module example.com/test\n\ngo 1.25.7\n")
+	writeFile(t, dir, "go.sum", "")
+
+	info := Detect(dir)
+	assert.Empty(t, info.DepsDir)
+}
+
 func TestDetect_Unknown(t *testing.T) {
 	dir := t.TempDir()
 
