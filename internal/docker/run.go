@@ -1,10 +1,7 @@
 package docker
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"strconv"
 )
 
@@ -16,10 +13,16 @@ type RunOptions struct {
 	Branch   string
 	Repo     string
 	LogsDir  string
+	PlanFile string
+	SpecsDir string
 }
 
 // Run executes docker run with the given options, attaching stdin/stdout/stderr.
 func Run(opts *RunOptions) error {
+	return runWithRunner(defaultRunner{}, opts)
+}
+
+func runWithRunner(runner CommandRunner, opts *RunOptions) error {
 	args := []string{
 		"run", "--rm", "-it",
 		"--security-opt", "no-new-privileges",
@@ -27,6 +30,8 @@ func Run(opts *RunOptions) error {
 		"-e", "GITHUB_PAT",
 		"-e", "REPO=" + opts.Repo,
 		"-e", "BRANCH=" + opts.Branch,
+		"-e", "PLAN_FILE=" + opts.PlanFile,
+		"-e", "SPECS_DIR=" + opts.SpecsDir,
 		"-v", opts.LogsDir + ":/app/logs",
 		opts.ImageTag,
 		"--",
@@ -34,12 +39,7 @@ func Run(opts *RunOptions) error {
 		strconv.Itoa(opts.MaxIter),
 	}
 
-	cmd := exec.CommandContext(context.Background(), "docker", args...) //nolint:gosec // args are constructed from validated options
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := runner.Run("docker", args...); err != nil {
 		return fmt.Errorf("docker run: %w", err)
 	}
 	return nil

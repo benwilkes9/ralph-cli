@@ -21,7 +21,7 @@ var allowedEnvVars = map[string]bool{
 
 // BuildAndRun orchestrates the full Docker workflow: detect repo, load env,
 // validate, build image, run container, and sync changes back.
-func BuildAndRun(mode string, maxIterations int, branch string) error {
+func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir string) error {
 	repo, err := DetectRepo()
 	if err != nil {
 		return fmt.Errorf("detecting repo: %w", err)
@@ -46,7 +46,7 @@ func BuildAndRun(mode string, maxIterations int, branch string) error {
 		return err
 	}
 
-	if err := preflight.Check(branch); err != nil {
+	if err := preflight.Check(branch, specsDir, planFile); err != nil {
 		return fmt.Errorf("preflight: %w", err)
 	}
 
@@ -69,6 +69,8 @@ func BuildAndRun(mode string, maxIterations int, branch string) error {
 		Branch:   branch,
 		Repo:     repo,
 		LogsDir:  logsDir,
+		PlanFile: planFile,
+		SpecsDir: specsDir,
 	}
 	if err := Run(runOpts); err != nil {
 		return err

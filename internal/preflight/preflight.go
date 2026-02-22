@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 // Check runs pre-flight validation before launching Docker. It verifies that
-// .ralph/ scaffold files exist on disk, auto-commits them if needed, and
-// pushes the branch to the remote.
-func Check(branch string) error {
+// .ralph/ scaffold files exist on disk, auto-commits them if needed, ensures
+// the specs and plans directories are tracked, and pushes the branch to the remote.
+func Check(branch, specsDir, planFile string) error {
 	repoRoot, err := git.RepoRoot()
 	if err != nil {
 		return fmt.Errorf("preflight: finding repo root: %w", err)
@@ -41,6 +42,27 @@ func Check(branch string) error {
 		}
 	}
 
+	// 2b. Auto-commit specs dir and plans dir if present but untracked.
+	for _, dir := range []string{specsDir, filepath.Dir(planFile)} {
+		dirPath := filepath.Join(repoRoot, dir)
+		if _, statErr := os.Stat(dirPath); os.IsNotExist(statErr) {
+			continue
+		}
+		dirTracked, trackErr := git.IsTracked(filepath.Join(dir, ".gitkeep"))
+		if trackErr != nil {
+			return fmt.Errorf("preflight: checking git tracking for %s: %w", dir, trackErr)
+		}
+		if !dirTracked {
+			fmt.Printf("Committing %s/ directory...\n", dir)
+			if addErr := git.Add(dir + "/"); addErr != nil {
+				return fmt.Errorf("preflight: git add %s/: %w", dir, addErr)
+			}
+			if commitErr := git.Commit(fmt.Sprintf("chore: add %s directory", dir)); commitErr != nil {
+				return fmt.Errorf("preflight: git commit: %w", commitErr)
+			}
+		}
+	}
+
 	// 3. Push branch to remote if it doesn't exist there yet.
 	exists, err := git.BranchExistsOnRemote(branch)
 	if err != nil {
@@ -54,15 +76,22 @@ func Check(branch string) error {
 		return nil
 	}
 
-	// 4. Push any unpushed .ralph/ changes.
-	diff, err := git.DiffFromRemote(branch, ".ralph/")
-	if err != nil {
-		return fmt.Errorf("preflight: checking unpushed changes: %w", err)
+	// 4. Push any unpushed changes in .ralph/, specs dir, or plans dir.
+	pushPaths := []string{".ralph/", specsDir + "/"}
+	if planDir := filepath.Dir(planFile) + "/"; !strings.HasPrefix(planDir, ".ralph/") {
+		pushPaths = append(pushPaths, planDir)
 	}
-	if diff != "" {
-		fmt.Println("Pushing .ralph/ changes to origin...")
-		if err := git.Push(branch); err != nil {
-			return fmt.Errorf("preflight: git push: %w", err)
+	for _, path := range pushPaths {
+		diff, err := git.DiffFromRemote(branch, path)
+		if err != nil {
+			return fmt.Errorf("preflight: checking unpushed changes in %s: %w", path, err)
+		}
+		if diff != "" {
+			fmt.Printf("Pushing %s changes to origin...\n", path)
+			if err := git.Push(branch); err != nil {
+				return fmt.Errorf("preflight: git push: %w", err)
+			}
+			break // one push sends everything
 		}
 	}
 

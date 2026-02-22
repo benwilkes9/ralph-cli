@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProcessFullIteration(t *testing.T) {
@@ -11,24 +14,12 @@ func TestProcessFullIteration(t *testing.T) {
 
 	var buf bytes.Buffer
 	stats, err := Process(f, &buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if stats.PeakContext <= 0 {
-		t.Errorf("expected positive peak context, got %d", stats.PeakContext)
-	}
-	if stats.Cost <= 0 {
-		t.Errorf("expected positive cost, got %f", stats.Cost)
-	}
-	if stats.ToolCalls <= 0 {
-		t.Errorf("expected positive tool calls, got %d", stats.ToolCalls)
-	}
-
-	output := buf.String()
-	if output == "" {
-		t.Error("expected non-empty formatted output")
-	}
+	assert.Greater(t, stats.PeakContext, 0)
+	assert.Greater(t, stats.Cost, 0.0)
+	assert.Greater(t, stats.ToolCalls, 0)
+	assert.NotEmpty(t, buf.String())
 }
 
 func TestProcessWithSubagents(t *testing.T) {
@@ -36,21 +27,12 @@ func TestProcessWithSubagents(t *testing.T) {
 
 	var buf bytes.Buffer
 	stats, err := Process(f, &buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if stats.SubagentTokens <= 0 {
-		t.Errorf("expected positive subagent tokens, got %d", stats.SubagentTokens)
-	}
-
+	assert.Greater(t, stats.SubagentTokens, 0)
 	output := buf.String()
-	if !strings.Contains(output, "▶") {
-		t.Error("expected Task tool formatting with ▶ in output")
-	}
-	if !strings.Contains(output, "✓") {
-		t.Error("expected subagent completion checkmark in output")
-	}
+	assert.Contains(t, output, "▶")
+	assert.Contains(t, output, "✓")
 }
 
 func TestProcessEmpty(t *testing.T) {
@@ -58,25 +40,13 @@ func TestProcessEmpty(t *testing.T) {
 	var buf bytes.Buffer
 
 	stats, err := Process(r, &buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if stats.PeakContext != 0 {
-		t.Errorf("expected zero peak context, got %d", stats.PeakContext)
-	}
-	if stats.Cost != 0 {
-		t.Errorf("expected zero cost, got %f", stats.Cost)
-	}
-	if stats.SubagentTokens != 0 {
-		t.Errorf("expected zero subagent tokens, got %d", stats.SubagentTokens)
-	}
-	if stats.ToolCalls != 0 {
-		t.Errorf("expected zero tool calls, got %d", stats.ToolCalls)
-	}
-	if buf.Len() != 0 {
-		t.Errorf("expected no output, got %q", buf.String())
-	}
+	assert.Equal(t, 0, stats.PeakContext)
+	assert.Equal(t, 0.0, stats.Cost)
+	assert.Equal(t, 0, stats.SubagentTokens)
+	assert.Equal(t, 0, stats.ToolCalls)
+	assert.Equal(t, 0, buf.Len())
 }
 
 func TestProcessMalformed(t *testing.T) {
@@ -84,13 +54,9 @@ func TestProcessMalformed(t *testing.T) {
 
 	var buf bytes.Buffer
 	stats, err := Process(f, &buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if stats.PeakContext == 0 {
-		t.Error("expected non-zero peak context from valid assistant event in malformed fixture")
-	}
+	assert.Greater(t, stats.PeakContext, 0, "expected non-zero peak context from valid assistant event in malformed fixture")
 }
 
 func TestProcessStatsAccumulation(t *testing.T) {
@@ -98,19 +64,11 @@ func TestProcessStatsAccumulation(t *testing.T) {
 
 	var buf bytes.Buffer
 	stats, err := Process(f, &buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cum := &CumulativeStats{}
 	cum.Update(stats)
-	if cum.Iterations != 1 {
-		t.Errorf("expected 1 iteration, got %d", cum.Iterations)
-	}
-	if cum.PeakContext != stats.PeakContext {
-		t.Errorf("expected peak context %d, got %d", stats.PeakContext, cum.PeakContext)
-	}
-	if cum.TotalCost != stats.Cost {
-		t.Errorf("expected cost %f, got %f", stats.Cost, cum.TotalCost)
-	}
+	assert.Equal(t, 1, cum.Iterations)
+	assert.Equal(t, stats.PeakContext, cum.PeakContext)
+	assert.Equal(t, stats.Cost, cum.TotalCost)
 }

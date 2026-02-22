@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -13,8 +14,9 @@ type Config struct {
 	Project string `yaml:"project"`
 	Agent   string `yaml:"agent"`
 
-	Backpressure Backpressure `yaml:"backpressure"`
-	Phases       Phases       `yaml:"phases"`
+	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
+	Backpressure      Backpressure `yaml:"backpressure"`
+	Phases            Phases       `yaml:"phases"`
 }
 
 // Backpressure defines the commands used to validate code quality between iterations.
@@ -91,11 +93,14 @@ func (c *Config) applyDefaults() {
 	if c.Agent == "" {
 		c.Agent = "claude"
 	}
+	if c.ProtectedBranches == nil {
+		c.ProtectedBranches = []string{"main", "master"}
+	}
 	if c.Phases.Plan.Prompt == "" {
 		c.Phases.Plan.Prompt = ".ralph/prompts/plan.md"
 	}
 	if c.Phases.Plan.Output == "" {
-		c.Phases.Plan.Output = ".ralph/IMPLEMENTATION_PLAN.md"
+		c.Phases.Plan.Output = ".ralph/plans/"
 	}
 	if c.Phases.Plan.MaxIterations == 0 {
 		c.Phases.Plan.MaxIterations = 5
@@ -106,4 +111,23 @@ func (c *Config) applyDefaults() {
 	if c.Phases.Build.MaxIterations == 0 {
 		c.Phases.Build.MaxIterations = 20
 	}
+}
+
+// PlanPathForBranch returns the branch-specific plan file path.
+// sanitizedBranch must already be sanitized via git.SanitizeBranch.
+// If the configured output is a directory (ends with /), the plan file is
+// placed inside it as IMPLEMENTATION_PLAN_{sanitized-branch}.md.
+// If the user set a custom file path, the branch suffix is inserted before
+// the extension.
+func (c *Config) PlanPathForBranch(sanitizedBranch string) string {
+	output := c.Phases.Plan.Output
+
+	if strings.HasSuffix(output, "/") {
+		return output + "IMPLEMENTATION_PLAN_" + sanitizedBranch + ".md"
+	}
+
+	// Custom file path: insert branch before extension.
+	ext := filepath.Ext(output)
+	base := strings.TrimSuffix(output, ext)
+	return base + "_" + sanitizedBranch + ext
 }

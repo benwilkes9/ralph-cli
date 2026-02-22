@@ -86,18 +86,26 @@ func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
 		result.Created = append(result.Created, mapping.output)
 	}
 
-	specsDir := filepath.Join(repoRoot, "specs")
-	gitkeep := filepath.Join(specsDir, ".gitkeep")
-	if fileExists(gitkeep) {
-		result.Skipped = append(result.Skipped, "specs/.gitkeep")
-	} else {
-		if err := os.MkdirAll(specsDir, 0o750); err != nil {
-			return nil, fmt.Errorf("creating specs dir: %w", err)
+	// Create .gitkeep files for specs/ and .ralph/plans/ directories.
+	for _, dir := range []struct {
+		path    string
+		display string
+	}{
+		{filepath.Join(repoRoot, "specs"), "specs/.gitkeep"},
+		{filepath.Join(repoRoot, ".ralph", "plans"), ".ralph/plans/.gitkeep"},
+	} {
+		gk := filepath.Join(dir.path, ".gitkeep")
+		if fileExists(gk) {
+			result.Skipped = append(result.Skipped, dir.display)
+		} else {
+			if err := os.MkdirAll(dir.path, 0o750); err != nil {
+				return nil, fmt.Errorf("creating %s dir: %w", dir.display, err)
+			}
+			if err := os.WriteFile(gk, nil, 0o600); err != nil {
+				return nil, fmt.Errorf("creating %s: %w", dir.display, err)
+			}
+			result.Created = append(result.Created, dir.display)
 		}
-		if err := os.WriteFile(gitkeep, nil, 0o600); err != nil {
-			return nil, fmt.Errorf("creating .gitkeep: %w", err)
-		}
-		result.Created = append(result.Created, "specs/.gitkeep")
 	}
 
 	if err := appendGitignore(repoRoot, result); err != nil {

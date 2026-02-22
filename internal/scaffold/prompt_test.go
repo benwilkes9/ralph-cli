@@ -5,6 +5,9 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // byteReader wraps a reader to deliver one byte at a time, preventing
@@ -36,9 +39,7 @@ func TestRunPrompts_SelectDefaults(t *testing.T) {
 		Out:        out,
 		Accessible: true,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	assertEqual(t, "RunCmd", info.RunCmd, "uv run uvicorn myapp.main:app")
 	assertEqual(t, "Goal", info.Goal, "Production-ready REST API")
@@ -60,9 +61,7 @@ func TestRunPrompts_CustomValues(t *testing.T) {
 		Out:        out,
 		Accessible: true,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	assertEqual(t, "RunCmd", info.RunCmd, "my custom cmd")
 	assertEqual(t, "Goal", info.Goal, "my custom goal")
@@ -77,21 +76,16 @@ func TestRunPrompts_OutputContainsPrompts(t *testing.T) {
 	input := "1\n1\n"
 	out := &bytes.Buffer{}
 
-	if err := RunPrompts(info, &PromptOptions{
+	err := RunPrompts(info, &PromptOptions{
 		In:         &byteReader{strings.NewReader(input)},
 		Out:        out,
 		Accessible: true,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
+	require.NoError(t, err)
 
 	output := out.String()
-	if !strings.Contains(output, "How do you start") {
-		t.Error("expected output to contain 'How do you start'")
-	}
-	if !strings.Contains(output, "ultimate goal") {
-		t.Error("expected output to contain 'ultimate goal'")
-	}
+	assert.Contains(t, output, "How do you start")
+	assert.Contains(t, output, "ultimate goal")
 }
 
 func TestRunPrompts_UnknownLanguageSelectsCustom(t *testing.T) {
@@ -110,9 +104,7 @@ func TestRunPrompts_UnknownLanguageSelectsCustom(t *testing.T) {
 		Out:        out,
 		Accessible: true,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	assertEqual(t, "RunCmd", info.RunCmd, "my run cmd")
 	assertEqual(t, "Goal", info.Goal, "Learning spike / reference")

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -106,6 +107,30 @@ func DiffFromRemote(branch, path string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+// unsafeChars matches characters that are not alphanumeric, hyphens, underscores, or dots.
+var unsafeChars = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+
+// SanitizeBranch converts a branch name into a safe filesystem-friendly string.
+// Slashes are replaced with hyphens, unsafe characters are stripped, and
+// leading/trailing hyphens are trimmed.
+func SanitizeBranch(branch string) string {
+	s := strings.ReplaceAll(branch, "/", "-")
+	s = unsafeChars.ReplaceAllString(s, "")
+	s = strings.Trim(s, "-")
+	return s
+}
+
+// IsProtectedBranch returns true if branch matches any entry in the protected
+// list (case-insensitive comparison).
+func IsProtectedBranch(branch string, protected []string) bool {
+	for _, p := range protected {
+		if strings.EqualFold(branch, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func run(args ...string) (string, error) {

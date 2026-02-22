@@ -12,7 +12,11 @@ install:
 	go install $(LDFLAGS) ./cmd/ralph
 
 test:
-	go test -race ./...
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -func=coverage.out | tail -1
+
+cover: test
+	go tool cover -html=coverage.out
 
 lint:
 	golangci-lint run ./...

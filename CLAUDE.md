@@ -18,7 +18,8 @@ ralph status  # Progress summary — tasks done, costs, pass/fail
 ```bash
 make build    # Build to bin/ralph
 make install  # Install to $GOPATH/bin
-make test     # go test -race ./...
+make test     # go test -race ./... with coverage report
+make cover    # open HTML coverage report in browser
 make lint     # golangci-lint run ./...
 ```
 
@@ -97,6 +98,34 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 Use scope when relevant: `feat(stream): add color support`
 Single line only. No body, no `Co-Authored-By` trailer.
+
+## Testing Conventions
+
+- Test behaviour, not implementation — tests should survive internal refactoring
+- Use table-driven tests for input/output variance; group integration-style assertions by concern
+- Test at the package boundary via exported functions; don't reach into unexported internals
+- Prioritise business logic, edge cases, and error paths (`error` returns are cheap to test in Go)
+- Target ~80% coverage per business logic package; exclude CLI entrypoints and thin adapters
+- Use `testify/assert` for assertions, `testify/require` to fail fast on preconditions
+- Prefer real temp dirs (`t.TempDir()`) over filesystem mocks
+- Fake the process boundary (git, docker) via injected interfaces, not by mocking internals
+
+### Command-level integration tests (`cmd/ralph`)
+
+Tests start at `cmd.Execute()` — the same entry point as typing `ralph plan` — and run all
+application code up to but not including the external process boundary (Docker). This is the
+equivalent of REST API tests that mock the database and call the real HTTP handler.
+
+**Pattern:**
+1. Create a real temporary git repo (`initRepoWithConfig`) and `os.Chdir` into it
+2. Inject a `fakeOrchestrator` in place of `docker.BuildAndRun`
+3. Call `cmd.Execute()` and assert on filesystem side-effects and `fake.calls`
+
+**Key seams:**
+- `Orchestrator` interface — injected into `planCmd`/`applyCmd`; production uses `realOrchestrator{}`
+- `cmd.InOrStdin()` / `cmd.OutOrStdout()` — used in `initCmd`/`statusCmd`; tests redirect with `cmd.SetIn`/`cmd.SetOut`
+- Git subprocesses — use real `git` CLI in a temp repo; do **not** mock git at this layer
+- Do **not** use `t.Parallel()` in `cmd/ralph` tests — `os.Chdir` is process-global
 
 ## Conventions
 
