@@ -12,15 +12,16 @@ if [ ${#missing[@]} -gt 0 ]; then
     exit 1
 fi
 
-# ─── Git config ──────────────────────────────────────────────────
-git config --global user.name "Claude"
-git config --global user.email "noreply@anthropic.com"
-git config --global commit.gpgsign false
+# ─── Git config (as claude — global config lives in ~claude) ──────
+runuser -u claude -- git config --global user.name "Claude"
+runuser -u claude -- git config --global user.email "noreply@anthropic.com"
+runuser -u claude -- git config --global commit.gpgsign false
+runuser -u claude -- git config --global --add safe.directory /workspace/repo
 
 # ─── Git credentials (avoid embedding token in URLs) ─────────────
-git config --global credential.helper store
-printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' \
-    "$GITHUB_PAT" | git credential approve
+runuser -u claude -- git config --global credential.helper store
+runuser -u claude -- bash -c "printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' \
+    \"\$GITHUB_PAT\" | git credential approve"
 unset GITHUB_PAT
 
 # ─── Network firewall (runs as root) ─────────────────────────────
@@ -55,6 +56,15 @@ if [ -n "${ALLOWED_DOMAINS:-}" ]; then
     iptables -A OUTPUT -j DROP
     unset ALLOWED_DOMAINS
     echo "Firewall configured."
+fi
+
+# ─── Fix deps volume ownership (Docker creates named volumes as root) ─
+if [ -n "${DEPS_DIR:-}" ]; then
+    # Defense-in-depth: reject traversal even though the Go side validates too.
+    case "$DEPS_DIR" in
+        /*|..|../*|*/../*|.) echo "Error: invalid DEPS_DIR: $DEPS_DIR" >&2; exit 1 ;;
+    esac
+    chown claude:claude "/workspace/repo/$DEPS_DIR"
 fi
 
 # ─── Drop to non-root user, install deps, and run ────────────────

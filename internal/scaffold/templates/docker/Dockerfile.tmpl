@@ -54,6 +54,7 @@ RUN chmod 750 /usr/local/bin/entrypoint.sh
 WORKDIR /workspace
 {{- if eq (str .Language) "python"}}
 ENV PATH="/home/claude/.local/bin:$PATH"
+ENV UV_LINK_MODE=copy
 RUN runuser -u claude -- uv python install {{.LanguageVersion}}
 {{- else if eq (str .Language) "go"}}
 ENV PATH="/home/claude/go/bin:$PATH"

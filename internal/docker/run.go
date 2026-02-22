@@ -43,7 +43,10 @@ func runWithRunner(runner CommandRunner, opts *RunOptions) error {
 	}
 
 	if opts.DepsDir != "" {
-		args = append(args, "-v", depsVolume(opts.ProjectName)+":/workspace/repo/"+opts.DepsDir)
+		args = append(args,
+			"-v", depsVolume(opts.ProjectName)+":/workspace/repo/"+opts.DepsDir,
+			"-e", "DEPS_DIR="+opts.DepsDir,
+		)
 	}
 
 	args = append(args,

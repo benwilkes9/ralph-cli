@@ -104,6 +104,7 @@ func TestRunWithRunner_DepsVolume_Present(t *testing.T) {
 	require.NoError(t, runWithRunner(r, opts))
 
 	assert.Contains(t, r.calls[0], "ralph-deps-myproject:/workspace/repo/node_modules")
+	assert.Contains(t, r.calls[0], "DEPS_DIR=node_modules")
 }
 
 func TestRunWithRunner_DepsVolume_Absent(t *testing.T) {
@@ -115,6 +116,7 @@ func TestRunWithRunner_DepsVolume_Absent(t *testing.T) {
 	call := r.calls[0]
 	for _, arg := range call {
 		assert.NotContains(t, arg, "ralph-deps-")
+		assert.NotContains(t, arg, "DEPS_DIR=")
 	}
 }
 
