@@ -64,7 +64,9 @@ internal/stream/        — JSONL stream parser, ANSI formatter, stats tracking
 internal/loop/          — Iteration loop orchestrator, stale detection
 internal/git/           — Git operations (shelling out to git CLI)
 internal/log/           — JSONL log file tee writer
-internal/docker/        — Docker build + run (shelling out to docker CLI)
+internal/docker/        — Docker build + run, network allowlist, bind mount (shelling out to docker CLI)
+internal/preflight/     — Pre-run validation (branch checks, auto-commit scaffolding, push if needed)
+internal/scaffold/      — Project detection, template rendering for ralph init
 internal/summary/       — Final summary box rendering
 templates/              — Embedded scaffold templates for ralph init (//go:embed)
 ```
@@ -73,6 +75,10 @@ templates/              — Embedded scaffold templates for ralph init (//go:emb
 
 - **Shell out** to `git` and `docker` CLIs rather than using Go SDKs — simpler, fewer deps
 - **No Docker SDK** — `docker build` and `docker run` via exec.Command
+- **Bind-mount workspace** — host project directory is mounted read-write at `/workspace/repo` inside the container; changes appear on the host in real time, no post-run git pull needed
+- **Network firewall** — iptables allowlist configured by root entrypoint, then privileges drop to `claude` user via `runuser`; DNS restricted to container's configured resolver(s) only
+- **Dependency volume** — optional named Docker volume overlays a dependency directory (e.g. `node_modules`) to survive container rebuilds; configured via `docker.deps_dir` in config
+- **DepsDir validation** — `docker.deps_dir` is validated against path traversal (`../`, absolute paths, `.`) to prevent volume mount escapes
 - **stream-json format** — Claude's `--output-format=stream-json` produces JSONL; we parse line-by-line with bufio.Scanner + json.Unmarshal
 - **Embedded templates** — scaffold files use Go's `text/template` + `//go:embed`
 - **Env var allowlist** — `.env` loading only permits `ANTHROPIC_API_KEY` and `GITHUB_PAT`; update `allowedEnvVars` in `internal/docker/docker.go` when adding new vars

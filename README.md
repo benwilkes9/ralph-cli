@@ -97,6 +97,28 @@ Ralph is branch-aware — plans and specs are isolated per branch so parallel fe
 
 Flags can be combined: `ralph plan -n 3 --specs specs/custom-dir`
 
+## Container Isolation
+
+Ralph runs Claude Code inside a Docker container with a bind-mounted workspace. Changes made by the agent appear on the host filesystem in real time — no sync step required.
+
+### Network Firewall
+
+Outbound network access is restricted to an allowlist of domains via iptables rules configured at container startup. The default allowlist covers the Anthropic API, GitHub, and npm. All other outbound traffic is dropped.
+
+### Security Layers
+
+| Layer | Threat Mitigated |
+|---|---|
+| Network firewall (iptables) | Data exfiltration to arbitrary hosts |
+| Non-root user (`runuser`) | Privilege escalation, firewall tampering |
+| `no-new-privileges` | Setuid/capability escalation |
+| Env var allowlist | Injection via compromised `.env` |
+| Bind mount scoping | Access to files outside project |
+
+### Recovery
+
+If the agent corrupts workspace files, use `git checkout` or `git stash` to recover — the bind mount means git operates on the same files.
+
 ## Configuration
 
 After `ralph init`, edit `.ralph/config.yaml` to configure:
@@ -104,6 +126,21 @@ After `ralph init`, edit `.ralph/config.yaml` to configure:
 - Project name and agent
 - Backpressure commands (test, typecheck, lint)
 - Phase-specific settings (prompt files, max iterations)
+- Network allowlist (extra domains the container can reach)
+- Dependency directory for volume caching (e.g. `node_modules`, `.venv`)
+
+```yaml
+# Extend the network allowlist (defaults: api.anthropic.com, github.com,
+# api.github.com, registry.npmjs.org)
+network:
+  extra_allowed_domains:
+    - pypi.org
+    - files.pythonhosted.org
+
+# Cache dependency directory in a named Docker volume to survive rebuilds
+docker:
+  deps_dir: node_modules
+```
 
 See `ralph init` output for file locations.
 
