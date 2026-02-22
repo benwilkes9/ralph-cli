@@ -88,7 +88,7 @@ Ralph is branch-aware — plans and specs are isolated per branch so parallel fe
 
 | Command | Description |
 |---------|-------------|
-| `ralph init` | Scaffold `.ralph/` in current repo (must be on a feature branch) |
+| `ralph init` | Scaffold `.ralph/` in current repo (must be on a feature branch). Use `--force` to overwrite existing files |
 | `ralph plan` | Run planning loop (generates implementation plan from specs) |
 | `ralph apply` | Run build loop (implements tasks from the plan one at a time) |
 | `ralph status` | Progress summary — tasks done, costs, pass/fail |
@@ -99,6 +99,7 @@ Ralph is branch-aware — plans and specs are isolated per branch so parallel fe
 |------|-------------|
 | `-n, --max <N>` | Limit iterations (e.g. `ralph plan -n 3`) |
 | `--specs <dir>` | Use a custom specs directory (default: `specs/{branch}`) |
+| `--force` | Overwrite existing scaffold files (useful after upgrading ralph) |
 
 Flags can be combined: `ralph plan -n 3 --specs specs/custom-dir`
 

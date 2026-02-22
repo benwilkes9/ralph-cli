@@ -55,26 +55,30 @@ var gitignoreEntries = []string{
 	".env",
 }
 
-// GenerateResult tracks which files were created or skipped.
+// GenerateResult tracks which files were created, overwritten, or skipped.
 type GenerateResult struct {
-	Created  []string
-	Skipped  []string
-	SpecsDir string // resolved specs directory including branch (e.g. "specs/my-feature")
+	Created     []string
+	Overwritten []string
+	Skipped     []string
+	SpecsDir    string // resolved specs directory including branch (e.g. "specs/my-feature")
 }
 
 // Generate renders all templates into the repo, skipping existing files.
 // branch is the current git branch used to resolve the specs directory;
 // if empty, the base SpecsDir is used as-is.
-func Generate(repoRoot, branch string, info *ProjectInfo) (*GenerateResult, error) {
+// When force is true, existing files are overwritten instead of skipped.
+func Generate(repoRoot, branch string, info *ProjectInfo, force bool) (*GenerateResult, error) {
 	result := &GenerateResult{}
 
 	for _, mapping := range templateMapping {
 		outputPath := filepath.Join(repoRoot, mapping.output)
 
-		if fileExists(outputPath) {
+		if !force && fileExists(outputPath) {
 			result.Skipped = append(result.Skipped, mapping.output)
 			continue
 		}
+
+		overwriting := force && fileExists(outputPath)
 
 		if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
 			return nil, fmt.Errorf("creating directory for %s: %w", mapping.output, err)
@@ -101,7 +105,11 @@ func Generate(repoRoot, branch string, info *ProjectInfo) (*GenerateResult, erro
 			}
 		}
 
-		result.Created = append(result.Created, mapping.output)
+		if overwriting {
+			result.Overwritten = append(result.Overwritten, mapping.output)
+		} else {
+			result.Created = append(result.Created, mapping.output)
+		}
 	}
 
 	specsDir := info.SpecsDir
@@ -210,6 +218,9 @@ func PrintSummary(w io.Writer, result *GenerateResult) {
 	printLine(w, "")
 	for _, f := range result.Created {
 		printLine(w, "  created  "+f)
+	}
+	for _, f := range result.Overwritten {
+		printLine(w, "  updated  "+f)
 	}
 	for _, f := range result.Skipped {
 		printLine(w, "  exists   "+f)

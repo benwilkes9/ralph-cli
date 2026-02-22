@@ -45,10 +45,15 @@ func main() {
 }
 
 func initCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold .ralph/ in current repo",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			force, err := cmd.Flags().GetBool("force")
+			if err != nil {
+				return fmt.Errorf("reading --force flag: %w", err)
+			}
+
 			repoRoot, err := git.RepoRoot()
 			if err != nil {
 				return fmt.Errorf("finding repo root: %w", err)
@@ -74,7 +79,7 @@ func initCmd() *cobra.Command {
 				return fmt.Errorf("running prompts: %w", err)
 			}
 
-			result, err := scaffold.Generate(repoRoot, branch, info)
+			result, err := scaffold.Generate(repoRoot, branch, info, force)
 			if err != nil {
 				return fmt.Errorf("generating scaffold: %w", err)
 			}
@@ -83,6 +88,8 @@ func initCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().Bool("force", false, "Overwrite existing scaffold files")
+	return cmd
 }
 
 // validateRelativePath returns an error if path is absolute or escapes the

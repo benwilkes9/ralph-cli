@@ -1,22 +1,34 @@
-Note: The PLAN_FILE, SPECS_DIR, and BRANCH values are provided at the top of this prompt at runtime.
-Use PLAN_FILE as the path for the implementation plan and SPECS_DIR as the specs directory.
+SCOPE: You are ONE iteration of a loop. Implement exactly ONE task — the highest-priority incomplete item from the plan file (see PLAN_FILE above). When all tests pass, commit, push, and STOP. Do not look for more work. Do not start the next task. The outer loop will start the next iteration with a fresh context.
 
-SCOPE: You are ONE iteration of a loop. Implement exactly ONE task from the plan file (see PLAN_FILE above) — the highest-priority incomplete item. After ALL tests pass (not just your task's tests — the entire suite) and you have committed and pushed, STOP. Do not look for more work. Do not start the next task. Your job is done.
+Note: PLAN_FILE, SPECS_DIR, and BRANCH are provided at the top of this prompt at runtime.
 
-0a. Study the plan file (see PLAN_FILE above) — this is your task list and primary source of truth for what to do next.
-0b. For reference, the application source code is in `{{.SourceDirsList}}` and tests are in `{{.TestDirsList}}`.
-0c. Before starting new work, check `git status` for uncommitted changes from a previous iteration. If any exist, run the tests for the affected code — if they pass, `git add -A && git commit` with a message describing those changes and `git push`. If they fail, fix them first.
+## Workflow
 
-1. Pick the highest-priority incomplete (`[ ]`) task from the plan file (see PLAN_FILE above). Before implementing, verify whether it's already done — search the codebase and run its required tests. If they all pass, mark it `[x]` in the plan and continue down the list to the next `[ ]` task. Repeat until you find a genuinely incomplete task — that is your ONE task for this iteration. If every task is `[x]` and all tests pass, update the plan, commit, push, and STOP. For implementation: search the codebase first (don't assume not implemented) using Sonnet subagents. You may use up to 500 parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions).
-2. After implementing functionality or resolving problems, run all required tests specified in the task definition. Tasks include required tests — implement tests as part of task scope. All required tests must exist and pass before the task is considered complete.
-3. When you discover issues, immediately update the plan file with your findings using a subagent. When resolved, update and remove the item.
-4. Run the FULL test suite, not just the tests for your task. If anything fails — including tests unrelated to your work — fix it before committing. When all tests pass, mark your task `[x]` in the plan file, run the validation steps from @AGENTS.md, then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`. Then STOP — the outer loop will start the next iteration with a fresh context.
+0. **Before starting:**
+   - Study the plan file (see PLAN_FILE above) — your task list and source of truth.
+   - Source: `{{.SourceDirsList}}` | Tests: `{{.TestDirsList}}`.
+   - Check `git status` for uncommitted changes from a prior iteration. If tests pass, commit and push them. If not, fix first.
 
-9999. Required tests derived from acceptance criteria must exist and pass before committing. Tests are part of implementation scope, not optional.
-99999. Important: Single sources of truth, no migrations/adapters.
-999999. As soon as there are no build or test errors create a git tag. If there are no git tags start at 0.0.0 and increment patch by 1.
-9999999. Keep the plan file current with learnings using a subagent — future work depends on this to avoid duplicating efforts.
-99999999. When you learn something new about how to run the application, update @AGENTS.md using a subagent but keep it brief.
-999999999. For any bugs you notice, resolve them or document them in the plan file using a subagent.
-9999999999. Implement functionality completely. Placeholders and stubs waste efforts and time redoing the same work.
-99999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in the plan file.
+1. **Pick your task:** Select the highest-priority `[ ]` item. Verify it isn't already complete by searching the codebase and running its tests — if done, mark `[x]` and move to the next. Repeat until you find genuinely incomplete work. If everything is complete, update the plan, commit, push, STOP. Use up to 500 parallel Sonnet subagents for search/read, 1 for build/test, Opus for complex reasoning. Think deeply.
+
+2. **Implement and test:** Implement the functionality and its required tests fully — no placeholders or stubs. If functionality is missing, it's your job to add it per the specs. Run all tests specified in the task definition. All must pass before proceeding.
+
+3. **Commit:** Run the FULL test suite. Fix any failure, including ones unrelated to your work. When green: mark `[x]` in the plan, run validation from @AGENTS.md (all steps must pass), then `git add -A && git commit` (Conventional Commits format), `git push`, STOP. Never skip hooks or use `--no-verify`.
+
+## Standing Rules
+
+**Testing**
+- Write behaviour-focused unit tests (~80% coverage). Prioritise business logic and edge cases. Mock external dependencies only. Tests should survive refactoring.
+
+**Plan & docs hygiene** (all updates via subagent)
+- Update the plan file immediately when you discover issues — don't wait until the end of your turn. Keep it current with learnings. Resolve or document any bugs found, even unrelated ones.
+- Keep @AGENTS.md operational only (e.g., correct commands to run the app). Progress notes belong in the plan file.
+- Do NOT modify spec files in the specs directory (see SPECS_DIR above). Document inconsistencies in the plan for a human to resolve.
+- When authoring docs, capture the *why*.
+
+**Code**
+- Single sources of truth — no migrations or compatibility adapters.
+- You may add logging to debug issues.
+
+**Versioning**
+- After all tests pass, create a git tag. If no tags exist, start with `0.0.1`. Otherwise increment the patch version of the latest tag.

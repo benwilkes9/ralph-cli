@@ -1,31 +1,36 @@
-Note: The PLAN_FILE, SPECS_DIR, and BRANCH values are provided at the top of this prompt at runtime.
-Use PLAN_FILE as the path for the implementation plan and SPECS_DIR as the specs directory.
+SCOPE: You are a planning iteration. Study the specs and codebase, then create or update the plan file (see PLAN_FILE above) with a correct, complete task list. Do NOT implement anything.
 
-0a. Study the specs directory (see SPECS_DIR above) with up to 250 parallel Sonnet subagents to learn the application specifications.
-0b. Study the plan file (see PLAN_FILE above), if present, to understand the plan so far.
-0c. Study `{{.SourceDirsList}}` with up to 250 parallel Sonnet subagents to understand shared utilities & components.
-0d. For reference, the application source code is in `{{.SourceDirsList}}` and tests are in `{{.TestDirsList}}`.
-0e. Before starting new work, check `git status` for uncommitted changes from a previous iteration. If any exist, review them and `git add -A && git commit` with a message describing those changes, then `git push`.
-0f. Review project-level files (`README.md`, etc.) and plan updates needed so that a new developer can clone the repo, follow the README, and have the app running. Include documentation tasks in the plan.
-
-1. Study the plan file (see PLAN_FILE above; if present, it may be incorrect) and use up to 500 Sonnet subagents to study existing source code and compare it against the specs directory (see SPECS_DIR above). Use an Opus subagent to analyze findings, prioritize tasks, and create/update the plan file. Ultrathink. Consider searching for TODO, minimal implementations, placeholders, skipped/flaky tests, and inconsistent patterns.
-
-TASK FORMAT: Each task in the plan must follow this structure:
-- **Title** with a `[ ]` (incomplete) or `[x]` (complete) checkbox. Mark tasks `[x]` if the code and tests already exist and pass — verify by searching the codebase, do not assume.
-- **Description** of what to implement.
-- **Spec(s):** which spec file(s) the task derives from. The build loop uses this to know which specs to read.
-- **Tests:** specific, concrete test scenarios derived from acceptance criteria. Each test should describe a verifiable outcome, not vague assertions (e.g., "tests pass"). Tests verify WHAT works (behavior, edge cases), not HOW it's implemented.
-- **Status:** `[ ]` or `[x]`
-
-PRIORITY ORDER: Sort tasks by dependency and priority — foundational tasks first (dependencies, DB layer, app scaffold), then core features, then advanced features, then cross-cutting concerns (error handling, validation), then documentation.
-
-IMPORTANT: Plan only. Do NOT implement anything. Do NOT assume functionality is missing; confirm with code search first.
-
-CONVERGENCE: If the plan file already exists and covers all specs, verify correctness but do NOT rewrite or restyle it. Only commit if you found a factual error or a missing task.
-
+Note: PLAN_FILE, SPECS_DIR, and BRANCH are provided at the top of this prompt at runtime.
 {{- if .Goal}}
 
-ULTIMATE GOAL: {{.Goal}}
+## Goal
+
+{{.Goal}}
 {{- end}}
 
-COMMIT: When you have made changes to any files (plan file, specs, etc.), `git add -A` then `git commit` with a message describing the changes, then `git push`. If nothing changed, do not create an empty commit.
+## Workflow
+
+0. **Preparation:**
+   - Study the specs directory (see SPECS_DIR above) with up to 250 parallel Sonnet subagents.
+   - Study `{{.SourceDirsList}}` and `{{.TestDirsList}}` with up to 250 parallel Sonnet subagents.
+   - Review the plan file (see PLAN_FILE above), if present; it may be incorrect.
+   - Review project files (`README.md`, etc.) — plan documentation tasks so a new developer can clone and run.
+   - Check `git status` for uncommitted changes from a prior iteration. If any, review, commit, and push.
+
+1. **Analyze and plan:** Compare codebase against specs using up to 500 Sonnet subagents. Use an Opus subagent to analyze findings, prioritize, and create/update the plan file. Think deeply. Search for TODOs, placeholders, minimal implementations, skipped/flaky tests, and inconsistent patterns. Do NOT assume functionality is missing — confirm with code search. If an element is missing from specs, search first to confirm — then author the specification at the appropriate path under SPECS_DIR and add a corresponding task to the plan.
+
+## Task Format
+
+Each task must include:
+- **Title** as a heading (e.g., `### Task 1.1: Short name`).
+- **Status** on its own line: `- [ ] **Status:** Incomplete` or `- [x] **Status:** Complete`. Mark `[x]` only if code and tests already exist and pass — verify by searching, don't assume.
+- **Description** of what to implement.
+- **Spec(s):** which spec file(s) the task derives from. The build loop uses this to know which specs to read.
+- **Tests:** specific, concrete test scenarios derived from acceptance criteria. Each describes a verifiable outcome, not vague assertions. Tests verify WHAT works (behavior, edge cases), not HOW.
+
+**Priority order:** foundational first (dependencies, DB, scaffold) → core features → advanced features → cross-cutting concerns (error handling, validation) → documentation.
+
+## Constraints
+
+- **Convergence:** If the plan file already covers all specs, verify correctness but do NOT rewrite or restyle. Only commit for factual errors (wrong status code, missing task, incorrect field name) or missing tasks. Do NOT commit formatting-only or rewording-only changes. The plan does not need to be perfect prose — it needs to be correct and complete.
+- **Commit:** When files changed, `git add -A && git commit` with a descriptive message, then `git push`. If nothing changed, don't commit. If only cosmetic changes, `git checkout -- .` and don't commit.

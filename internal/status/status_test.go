@@ -58,6 +58,52 @@ func TestParsePlan(t *testing.T) {
 	}
 }
 
+const samplePlanNewFormat = `# Implementation Plan
+
+## Overview
+Build the thing.
+
+### Task 1.1: Dependencies and project config
+- [x] **Status:** Complete
+- **Description:** Initialize go module and set up linting.
+
+### Task 1.2: Database layer
+- [x] **Status:** Complete
+- **Description:** Create schema and write migrations.
+
+### Task 2.1: Delete todo endpoint
+- [ ] **Status:** Incomplete
+- **Description:** Add DELETE route and write handler.
+
+### Task 2.2: List filtering and search
+- [ ] **Status:** Incomplete
+- **Description:** Add query params.
+`
+
+func TestParsePlan_NewFormat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "IMPLEMENTATION_PLAN.md")
+	require.NoError(t, os.WriteFile(path, []byte(samplePlanNewFormat), 0o600))
+
+	tasks, err := ParsePlan(path)
+	require.NoError(t, err)
+	require.Len(t, tasks, 4)
+
+	want := []struct {
+		title string
+		done  bool
+	}{
+		{"Dependencies and project config", true},
+		{"Database layer", true},
+		{"Delete todo endpoint", false},
+		{"List filtering and search", false},
+	}
+	for i, w := range want {
+		assert.Equal(t, w.title, tasks[i].Title, "task %d title", i)
+		assert.Equal(t, w.done, tasks[i].Done, "task %d done", i)
+	}
+}
+
 func TestParsePlanMissingFile(t *testing.T) {
 	tasks, err := ParsePlan("/nonexistent/path/plan.md")
 	require.NoError(t, err)

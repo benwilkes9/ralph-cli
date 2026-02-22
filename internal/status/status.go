@@ -28,7 +28,7 @@ type RunInfo struct {
 	Cost float64
 }
 
-var taskHeadingRe = regexp.MustCompile(`^###\s+Task\s+\d+\s*[-–—]+\s*(.+)`)
+var taskHeadingRe = regexp.MustCompile(`^###\s+Task\s+[\d.]+\s*[-–—:]+\s*(.+)`)
 
 // ParsePlan reads an IMPLEMENTATION_PLAN.md and extracts tasks from it.
 // Returns nil, nil if the file does not exist (plan not yet generated).
