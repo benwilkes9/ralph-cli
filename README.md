@@ -103,7 +103,20 @@ Ralph runs Claude Code inside a Docker container with a bind-mounted workspace. 
 
 ### Network Firewall
 
-Outbound network access is restricted to an allowlist of domains via iptables rules configured at container startup. The default allowlist covers the Anthropic API, GitHub, and npm. All other outbound traffic is dropped.
+Outbound network access is restricted to an allowlist of domains via iptables rules configured at container startup. All other outbound traffic is dropped.
+
+**Default allowlist** (always included): `api.anthropic.com`, `github.com`, `api.github.com`, `registry.npmjs.org`
+
+`ralph init` automatically adds the package registry domains for your detected ecosystem:
+
+| Ecosystem | Extra Domains |
+|---|---|
+| Python (uv, poetry) | `pypi.org`, `files.pythonhosted.org` |
+| Go | `proxy.golang.org`, `sum.golang.org`, `storage.googleapis.com` |
+| Rust (cargo) | `crates.io`, `static.crates.io`, `index.crates.io` |
+| Node (npm, yarn, pnpm) | _(covered by default allowlist)_ |
+
+You can add more domains in `.ralph/config.yaml` under `network.extra_allowed_domains`.
 
 ### Security Layers
 
@@ -130,8 +143,8 @@ After `ralph init`, edit `.ralph/config.yaml` to configure:
 - Dependency directory for volume caching (e.g. `node_modules`, `.venv`)
 
 ```yaml
-# Extend the network allowlist (defaults: api.anthropic.com, github.com,
-# api.github.com, registry.npmjs.org)
+# Auto-populated by ralph init based on detected ecosystem.
+# Add more domains as needed.
 network:
   extra_allowed_domains:
     - pypi.org
@@ -139,7 +152,7 @@ network:
 
 # Cache dependency directory in a named Docker volume to survive rebuilds
 docker:
-  deps_dir: node_modules
+  deps_dir: .venv
 ```
 
 See `ralph init` output for file locations.

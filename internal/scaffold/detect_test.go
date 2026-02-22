@@ -142,6 +142,46 @@ func TestDetect_DepsDir_Go_Empty(t *testing.T) {
 	assert.Empty(t, info.DepsDir)
 }
 
+func TestDetect_ExtraAllowedDomains_Python(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "uv.lock", "")
+
+	info := Detect(dir)
+	assert.Equal(t, []string{"pypi.org", "files.pythonhosted.org"}, info.ExtraAllowedDomains)
+}
+
+func TestDetect_ExtraAllowedDomains_Go(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.mod", "module example.com/test\n\ngo 1.25.7\n")
+	writeFile(t, dir, "go.sum", "")
+
+	info := Detect(dir)
+	assert.Equal(t, []string{"proxy.golang.org", "sum.golang.org", "storage.googleapis.com"}, info.ExtraAllowedDomains)
+}
+
+func TestDetect_ExtraAllowedDomains_Rust(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "Cargo.toml", "[package]\nname = \"test\"")
+
+	info := Detect(dir)
+	assert.Equal(t, []string{"crates.io", "static.crates.io", "index.crates.io"}, info.ExtraAllowedDomains)
+}
+
+func TestDetect_ExtraAllowedDomains_Node_Empty(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "package-lock.json", "{}")
+
+	info := Detect(dir)
+	assert.Empty(t, info.ExtraAllowedDomains)
+}
+
+func TestDetect_ExtraAllowedDomains_Unknown_Empty(t *testing.T) {
+	dir := t.TempDir()
+
+	info := Detect(dir)
+	assert.Empty(t, info.ExtraAllowedDomains)
+}
+
 func TestDetect_Unknown(t *testing.T) {
 	dir := t.TempDir()
 

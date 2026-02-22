@@ -48,6 +48,15 @@ const (
 	depsTarget      = "target"
 )
 
+// Ecosystem-specific package registry domains. These are added to
+// extra_allowed_domains in the generated config so the container can
+// reach the right registries for dependency installation.
+var (
+	domainsPython = []string{"pypi.org", "files.pythonhosted.org"}
+	domainsGo     = []string{"proxy.golang.org", "sum.golang.org", "storage.googleapis.com"}
+	domainsRust   = []string{"crates.io", "static.crates.io", "index.crates.io"}
+)
+
 // ProjectInfo holds detected and user-provided project metadata used to render templates.
 type ProjectInfo struct {
 	ProjectName     string
@@ -55,7 +64,8 @@ type ProjectInfo struct {
 	LanguageVersion string
 	PackageManager  PackageManager
 
-	DepsDir string // "node_modules", ".venv", "target", ""
+	DepsDir             string   // "node_modules", ".venv", "target", ""
+	ExtraAllowedDomains []string // ecosystem-specific package registry domains
 
 	InstallCmd   string
 	TestCmd      string
@@ -163,18 +173,21 @@ func applyEcosystemDefaults(info *ProjectInfo) {
 		info.TypecheckCmd = "uv run pyright"
 		info.LintCmd = "uv run ruff check"
 		info.DepsDir = depsVenv
+		info.ExtraAllowedDomains = domainsPython
 	case PmPoetry:
 		info.InstallCmd = "poetry install"
 		info.TestCmd = "poetry run pytest"
 		info.TypecheckCmd = "poetry run pyright"
 		info.LintCmd = "poetry run ruff check"
 		info.DepsDir = depsVenv
+		info.ExtraAllowedDomains = domainsPython
 	case PmNPM:
 		info.InstallCmd = "npm install"
 		info.TestCmd = "npm test"
 		info.TypecheckCmd = "npx tsc --noEmit"
 		info.LintCmd = "npm run lint"
 		info.DepsDir = depsNodeModules
+		// Node: registry.npmjs.org is already in the default allowlist
 	case PmYarn:
 		info.InstallCmd = "yarn install"
 		info.TestCmd = "yarn test"
@@ -192,6 +205,7 @@ func applyEcosystemDefaults(info *ProjectInfo) {
 		info.TestCmd = "go test ./..."
 		info.TypecheckCmd = ""
 		info.LintCmd = "golangci-lint run ./..."
+		info.ExtraAllowedDomains = domainsGo
 		// Go module cache is outside project dir — no DepsDir needed
 	case PmCargo:
 		info.InstallCmd = "cargo build"
@@ -199,6 +213,7 @@ func applyEcosystemDefaults(info *ProjectInfo) {
 		info.TypecheckCmd = ""
 		info.LintCmd = "cargo clippy"
 		info.DepsDir = depsTarget
+		info.ExtraAllowedDomains = domainsRust
 	}
 }
 
