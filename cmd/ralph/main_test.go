@@ -2,16 +2,16 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/benwilkes9/ralph-cli/internal/testutil"
 )
 
 // NOTE: No t.Parallel() in this file — os.Chdir is process-global.
@@ -51,12 +51,12 @@ func (br *byteReader) Read(p []byte) (int, error) {
 func initSimpleRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	runGitCmd(t, dir, "init", "--initial-branch=main")
-	runGitCmd(t, dir, "config", "user.name", "test")
-	runGitCmd(t, dir, "config", "user.email", "test@test.com")
-	runGitCmd(t, dir, "config", "commit.gpgsign", "false")
-	runGitCmd(t, dir, "commit", "--allow-empty", "-m", "init")
-	runGitCmd(t, dir, "checkout", "-b", "feature-test")
+	testutil.RunGit(t, dir, "init", "--initial-branch=main")
+	testutil.RunGit(t, dir, "config", "user.name", "test")
+	testutil.RunGit(t, dir, "config", "user.email", "test@test.com")
+	testutil.RunGit(t, dir, "config", "commit.gpgsign", "false")
+	testutil.RunGit(t, dir, "commit", "--allow-empty", "-m", "init")
+	testutil.RunGit(t, dir, "checkout", "-b", "feature-test")
 	return dir
 }
 
@@ -70,24 +70,6 @@ func initRepoWithConfig(t *testing.T) string {
 	return dir
 }
 
-func runGitCmd(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // args are test-controlled
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %s: %s\n%s", strings.Join(args, " "), err, out)
-	}
-}
-
-func chdirTest(t *testing.T, dir string) {
-	t.Helper()
-	orig, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(dir))
-	t.Cleanup(func() { os.Chdir(orig) }) //nolint:errcheck // best-effort restore
-}
-
 // --- validateRelativePath ---
 
 func TestValidateRelativePath(t *testing.T) {
@@ -99,7 +81,9 @@ func TestValidateRelativePath(t *testing.T) {
 		{"specs/feature", false},
 		{"custom-specs", false},
 		{"a/b/c", false},
-		{".", false},
+
+		// current dir
+		{".", true},
 
 		// absolute paths
 		{"/etc/passwd", true},
@@ -129,7 +113,7 @@ func TestValidateRelativePath(t *testing.T) {
 
 func TestResolveRunParams_DefaultPaths(t *testing.T) {
 	dir := initRepoWithConfig(t)
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	cmd := planCmd(&fakeOrchestrator{})
 
@@ -143,7 +127,7 @@ func TestResolveRunParams_DefaultPaths(t *testing.T) {
 
 func TestResolveRunParams_CustomSpecs(t *testing.T) {
 	dir := initRepoWithConfig(t)
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	cmd := planCmd(&fakeOrchestrator{})
 	require.NoError(t, cmd.Flags().Set("specs", "custom/path"))
@@ -157,14 +141,14 @@ func TestResolveRunParams_CustomSpecs(t *testing.T) {
 func TestResolveRunParams_ProtectedBranch(t *testing.T) {
 	// Stay on main (protected by default).
 	dir := t.TempDir()
-	runGitCmd(t, dir, "init", "--initial-branch=main")
-	runGitCmd(t, dir, "config", "user.name", "test")
-	runGitCmd(t, dir, "config", "user.email", "test@test.com")
-	runGitCmd(t, dir, "config", "commit.gpgsign", "false")
-	runGitCmd(t, dir, "commit", "--allow-empty", "-m", "init")
+	testutil.RunGit(t, dir, "init", "--initial-branch=main")
+	testutil.RunGit(t, dir, "config", "user.name", "test")
+	testutil.RunGit(t, dir, "config", "user.email", "test@test.com")
+	testutil.RunGit(t, dir, "config", "commit.gpgsign", "false")
+	testutil.RunGit(t, dir, "commit", "--allow-empty", "-m", "init")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".ralph"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ralph", "config.yaml"), []byte("project: test\n"), 0o600))
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	cmd := planCmd(&fakeOrchestrator{})
 	_, err := resolveRunParams(cmd)
@@ -175,7 +159,7 @@ func TestResolveRunParams_ProtectedBranch(t *testing.T) {
 // --- initCmd ---
 
 func TestInitCmd_NotInGitRepo(t *testing.T) {
-	chdirTest(t, t.TempDir())
+	testutil.Chdir(t, t.TempDir())
 
 	cmd := initCmd()
 	err := cmd.Execute()
@@ -185,10 +169,10 @@ func TestInitCmd_NotInGitRepo(t *testing.T) {
 
 func TestInitCmd_CreatesScaffold(t *testing.T) {
 	dir := t.TempDir()
-	runGitCmd(t, dir, "init", "--initial-branch=main")
-	runGitCmd(t, dir, "config", "user.name", "test")
-	runGitCmd(t, dir, "config", "user.email", "test@test.com")
-	chdirTest(t, dir)
+	testutil.RunGit(t, dir, "init", "--initial-branch=main")
+	testutil.RunGit(t, dir, "config", "user.name", "test")
+	testutil.RunGit(t, dir, "config", "user.email", "test@test.com")
+	testutil.Chdir(t, dir)
 
 	cmd := initCmd()
 	cmd.SetIn(&byteReader{strings.NewReader("1\n1\n")})
@@ -202,7 +186,7 @@ func TestInitCmd_CreatesScaffold(t *testing.T) {
 
 func TestPlanCmd_CreatesDirectoriesAndCallsOrchestrator(t *testing.T) {
 	dir := initRepoWithConfig(t)
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	fake := &fakeOrchestrator{}
 	cmd := planCmd(fake)
@@ -219,14 +203,14 @@ func TestPlanCmd_CreatesDirectoriesAndCallsOrchestrator(t *testing.T) {
 
 func TestPlanCmd_ProtectedBranch(t *testing.T) {
 	dir := t.TempDir()
-	runGitCmd(t, dir, "init", "--initial-branch=main")
-	runGitCmd(t, dir, "config", "user.name", "test")
-	runGitCmd(t, dir, "config", "user.email", "test@test.com")
-	runGitCmd(t, dir, "config", "commit.gpgsign", "false")
-	runGitCmd(t, dir, "commit", "--allow-empty", "-m", "init")
+	testutil.RunGit(t, dir, "init", "--initial-branch=main")
+	testutil.RunGit(t, dir, "config", "user.name", "test")
+	testutil.RunGit(t, dir, "config", "user.email", "test@test.com")
+	testutil.RunGit(t, dir, "config", "commit.gpgsign", "false")
+	testutil.RunGit(t, dir, "commit", "--allow-empty", "-m", "init")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".ralph"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ralph", "config.yaml"), []byte("project: test\n"), 0o600))
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	fake := &fakeOrchestrator{}
 	cmd := planCmd(fake)
@@ -239,7 +223,7 @@ func TestPlanCmd_ProtectedBranch(t *testing.T) {
 
 func TestApplyCmd_MissingPlanFile(t *testing.T) {
 	dir := initRepoWithConfig(t)
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	fake := &fakeOrchestrator{}
 	cmd := applyCmd(fake)
@@ -252,7 +236,7 @@ func TestApplyCmd_MissingPlanFile(t *testing.T) {
 
 func TestApplyCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
 	dir := initRepoWithConfig(t)
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	planPath := filepath.Join(dir, ".ralph", "plans", "IMPLEMENTATION_PLAN_feature-test.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(planPath), 0o750))
@@ -272,7 +256,7 @@ func TestApplyCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
 
 func TestStatusCmd_RendersOutput(t *testing.T) {
 	dir := initRepoWithConfig(t)
-	chdirTest(t, dir)
+	testutil.Chdir(t, dir)
 
 	cmd := statusCmd()
 	var out bytes.Buffer

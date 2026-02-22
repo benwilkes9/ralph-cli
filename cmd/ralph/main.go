@@ -82,7 +82,7 @@ func validateRelativePath(flag, path string) error {
 		return fmt.Errorf("--%s must be a relative path, got %q", flag, path)
 	}
 	clean := filepath.Clean(path)
-	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("--%s must stay within the repository root, got %q", flag, path)
 	}
 	return nil

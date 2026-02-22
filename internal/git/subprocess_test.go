@@ -6,81 +6,22 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/benwilkes9/ralph-cli/internal/testutil"
 )
 
 // NOTE: Do NOT add t.Parallel() to any test in this file.
 // os.Chdir is process-global; parallel tests would race on the working directory.
 
-// initBareAndClone creates a bare remote and a clone, configures git identity,
-// makes an initial commit, pushes to the remote, and returns (bare, clone) paths.
-func initBareAndClone(t *testing.T) (bare, clone string) {
-	t.Helper()
-
-	bare = t.TempDir()
-	runGitHelper(t, bare, "init", "--bare", "--initial-branch=main")
-
-	clone = t.TempDir()
-	runGitHelperNoDir(t, "clone", bare, clone)
-
-	runGitHelper(t, clone, "config", "user.name", "test")
-	runGitHelper(t, clone, "config", "user.email", "test@test.com")
-	runGitHelper(t, clone, "config", "commit.gpgsign", "false")
-
-	runGitHelper(t, clone, "commit", "--allow-empty", "-m", "init")
-	runGitHelper(t, clone, "push", "origin", "main")
-
-	return bare, clone
-}
-
-func runGitHelper(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // args are test-controlled
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=test",
-		"GIT_AUTHOR_EMAIL=test@test.com",
-		"GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@test.com",
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %s failed: %s\n%s", strings.Join(args, " "), err, out)
-	}
-}
-
-func runGitHelperNoDir(t *testing.T, args ...string) {
-	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // args are test-controlled
-	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=test",
-		"GIT_AUTHOR_EMAIL=test@test.com",
-		"GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@test.com",
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %s failed: %s\n%s", strings.Join(args, " "), err, out)
-	}
-}
-
-func chdir(t *testing.T, dir string) {
-	t.Helper()
-	orig, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(dir))
-	t.Cleanup(func() { os.Chdir(orig) }) //nolint:errcheck // best-effort restore
-}
-
 // TestHead verifies that Head() returns a 40-character hex SHA and errors
 // when called outside a git repo.
 func TestHead(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	head, err := Head()
 	require.NoError(t, err)
@@ -88,7 +29,7 @@ func TestHead(t *testing.T) {
 }
 
 func TestHead_NotARepo(t *testing.T) {
-	chdir(t, t.TempDir())
+	testutil.Chdir(t, t.TempDir())
 
 	_, err := Head()
 	assert.Error(t, err)
@@ -96,8 +37,8 @@ func TestHead_NotARepo(t *testing.T) {
 
 // TestBranch verifies Branch() returns the current branch name.
 func TestBranch(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	branch, err := Branch()
 	require.NoError(t, err)
@@ -105,10 +46,10 @@ func TestBranch(t *testing.T) {
 }
 
 func TestBranch_FeatureBranch(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
-	runGitHelper(t, clone, "checkout", "-b", "feature-test")
+	testutil.RunGit(t, clone, "checkout", "-b", "feature-test")
 
 	branch, err := Branch()
 	require.NoError(t, err)
@@ -117,8 +58,8 @@ func TestBranch_FeatureBranch(t *testing.T) {
 
 // TestAddAndCommit verifies that Add + Commit creates a commit visible in git log.
 func TestAddAndCommit(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	f := filepath.Join(clone, "hello.txt")
 	require.NoError(t, os.WriteFile(f, []byte("hello"), 0o600))
@@ -135,8 +76,8 @@ func TestAddAndCommit(t *testing.T) {
 
 // TestAdd_NonExistentPath verifies that staging a missing file returns an error.
 func TestAdd_NonExistentPath(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	err := Add("nonexistent.txt")
 	assert.Error(t, err)
@@ -144,13 +85,13 @@ func TestAdd_NonExistentPath(t *testing.T) {
 
 // TestPush verifies that Push sends a committed change to the bare remote.
 func TestPush(t *testing.T) {
-	bare, clone := initBareAndClone(t)
-	chdir(t, clone)
+	bare, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	f := filepath.Join(clone, "pushed.txt")
 	require.NoError(t, os.WriteFile(f, []byte("pushed"), 0o600))
-	runGitHelper(t, clone, "add", "pushed.txt")
-	runGitHelper(t, clone, "commit", "-m", "push test")
+	testutil.RunGit(t, clone, "add", "pushed.txt")
+	testutil.RunGit(t, clone, "commit", "-m", "push test")
 
 	require.NoError(t, Push("main"))
 
@@ -164,10 +105,10 @@ func TestPush(t *testing.T) {
 
 // TestPushSetUpstream verifies that a local-only branch is created on the remote.
 func TestPushSetUpstream(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
-	runGitHelper(t, clone, "checkout", "-b", "upstream-test")
+	testutil.RunGit(t, clone, "checkout", "-b", "upstream-test")
 
 	require.NoError(t, PushSetUpstream("upstream-test"))
 
@@ -179,8 +120,8 @@ func TestPushSetUpstream(t *testing.T) {
 
 // TestPullRebase verifies that a commit added to the bare remote is pulled into the clone.
 func TestPullRebase(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	// Discover the remote URL of the current clone.
 	remoteURL, err := RemoteURL("origin")
@@ -188,15 +129,16 @@ func TestPullRebase(t *testing.T) {
 
 	// Push a new commit via a second clone of the same remote.
 	clone2 := t.TempDir()
-	runGitHelperNoDir(t, "clone", remoteURL, clone2)
-	runGitHelper(t, clone2, "config", "user.name", "test")
-	runGitHelper(t, clone2, "config", "user.email", "test@test.com")
+	testutil.RunGitNoDir(t, "clone", remoteURL, clone2)
+	testutil.RunGit(t, clone2, "config", "user.name", "test")
+	testutil.RunGit(t, clone2, "config", "user.email", "test@test.com")
+	testutil.RunGit(t, clone2, "config", "commit.gpgsign", "false")
 
 	f := filepath.Join(clone2, "remote.txt")
 	require.NoError(t, os.WriteFile(f, []byte("remote"), 0o600))
-	runGitHelper(t, clone2, "add", "remote.txt")
-	runGitHelper(t, clone2, "commit", "-m", "remote commit")
-	runGitHelper(t, clone2, "push", "origin", "main")
+	testutil.RunGit(t, clone2, "add", "remote.txt")
+	testutil.RunGit(t, clone2, "commit", "-m", "remote commit")
+	testutil.RunGit(t, clone2, "push", "origin", "main")
 
 	require.NoError(t, PullRebase("main"))
 
@@ -210,8 +152,8 @@ func TestPullRebase(t *testing.T) {
 
 // TestRemoteURL verifies RemoteURL returns the origin URL and errors for unknown remotes.
 func TestRemoteURL(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	url, err := RemoteURL("origin")
 	require.NoError(t, err)
@@ -219,8 +161,8 @@ func TestRemoteURL(t *testing.T) {
 }
 
 func TestRemoteURL_Unknown(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	_, err := RemoteURL("nonexistent")
 	assert.Error(t, err)
@@ -228,10 +170,10 @@ func TestRemoteURL_Unknown(t *testing.T) {
 
 // TestRepoRoot verifies RepoRoot returns the clone root even from a subdirectory.
 func TestRepoRoot(t *testing.T) {
-	_, clone := initBareAndClone(t)
+	_, clone := testutil.InitBareAndClone(t)
 	sub := filepath.Join(clone, "a", "b")
 	require.NoError(t, os.MkdirAll(sub, 0o750))
-	chdir(t, sub)
+	testutil.Chdir(t, sub)
 
 	root, err := RepoRoot()
 	require.NoError(t, err)
@@ -246,8 +188,8 @@ func TestRepoRoot(t *testing.T) {
 
 // TestIsTracked verifies IsTracked behaviour for untracked, committed, and missing paths.
 func TestIsTracked(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	// Untracked file.
 	f := filepath.Join(clone, "untracked.txt")
@@ -258,8 +200,8 @@ func TestIsTracked(t *testing.T) {
 	assert.False(t, tracked)
 
 	// After staging + committing.
-	runGitHelper(t, clone, "add", "untracked.txt")
-	runGitHelper(t, clone, "commit", "-m", "track it")
+	testutil.RunGit(t, clone, "add", "untracked.txt")
+	testutil.RunGit(t, clone, "commit", "-m", "track it")
 
 	tracked, err = IsTracked("untracked.txt")
 	require.NoError(t, err)
@@ -273,14 +215,14 @@ func TestIsTracked(t *testing.T) {
 
 // TestBranchExistsOnRemote verifies BranchExistsOnRemote for existing and local-only branches.
 func TestBranchExistsOnRemote(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	exists, err := BranchExistsOnRemote("main")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
-	runGitHelper(t, clone, "checkout", "-b", "local-only")
+	testutil.RunGit(t, clone, "checkout", "-b", "local-only")
 
 	exists, err = BranchExistsOnRemote("local-only")
 	require.NoError(t, err)
@@ -289,8 +231,8 @@ func TestBranchExistsOnRemote(t *testing.T) {
 
 // TestDiffFromRemote verifies DiffFromRemote is empty when synced and non-empty after a local commit.
 func TestDiffFromRemote(t *testing.T) {
-	_, clone := initBareAndClone(t)
-	chdir(t, clone)
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
 
 	diff, err := DiffFromRemote("main", ".")
 	require.NoError(t, err)
@@ -299,8 +241,8 @@ func TestDiffFromRemote(t *testing.T) {
 	// Add a local commit without pushing.
 	f := filepath.Join(clone, "local.txt")
 	require.NoError(t, os.WriteFile(f, []byte("local"), 0o600))
-	runGitHelper(t, clone, "add", "local.txt")
-	runGitHelper(t, clone, "commit", "-m", "local change")
+	testutil.RunGit(t, clone, "add", "local.txt")
+	testutil.RunGit(t, clone, "commit", "-m", "local change")
 
 	diff, err = DiffFromRemote("main", ".")
 	require.NoError(t, err)
