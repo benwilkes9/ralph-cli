@@ -97,14 +97,6 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 			RenderIterationSummary(w, iterStats, logW.Path())
 		}
 
-		// Push with fallback to --set-upstream.
-		if pushErr := gitCl.Push(opts.Branch); pushErr != nil {
-			RenderPushFallback(w)
-			if upErr := gitCl.PushSetUpstream(opts.Branch); upErr != nil {
-				fmt.Fprintf(w, "%sPush failed: %s%s\n", stream.Dim, upErr, stream.Reset) //nolint:errcheck // display-only
-			}
-		}
-
 		// Check for stale iterations.
 		headAfter, err := gitCl.Head()
 		if err != nil {
@@ -121,6 +113,14 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 			}
 		} else {
 			stale.Check(headAfter) // reset
+
+			// Push with fallback to --set-upstream.
+			if pushErr := gitCl.Push(opts.Branch); pushErr != nil {
+				RenderPushFallback(w)
+				if upErr := gitCl.PushSetUpstream(opts.Branch); upErr != nil {
+					fmt.Fprintf(w, "%sPush failed: %s%s\n", stream.Dim, upErr, stream.Reset) //nolint:errcheck // display-only
+				}
+			}
 		}
 	}
 
