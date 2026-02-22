@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerate_CreatesAllFiles(t *testing.T) {
@@ -25,9 +28,7 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 	}
 
 	result, err := Generate(dir, info)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	expectedFiles := []string{
 		".ralph/config.yaml",
@@ -43,15 +44,10 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 	}
 
 	for _, f := range expectedFiles {
-		path := filepath.Join(dir, f)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			t.Errorf("expected file %s to exist", f)
-		}
+		assert.FileExists(t, filepath.Join(dir, f))
 	}
 
-	if len(result.Created) < len(expectedFiles) {
-		t.Errorf("expected at least %d created files, got %d: %v", len(expectedFiles), len(result.Created), result.Created)
-	}
+	assert.GreaterOrEqual(t, len(result.Created), len(expectedFiles))
 }
 
 func TestGenerate_ConfigContent(t *testing.T) {
@@ -68,25 +64,15 @@ func TestGenerate_ConfigContent(t *testing.T) {
 	}
 
 	_, err := Generate(dir, info)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "config.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s := string(content)
 
-	if !strings.Contains(s, `project: "myapp"`) {
-		t.Error("config should contain project name")
-	}
-	if !strings.Contains(s, `test: "go test ./..."`) {
-		t.Error("config should contain test command")
-	}
-	if !strings.Contains(s, `lint: "golangci-lint run ./..."`) {
-		t.Error("config should contain lint command")
-	}
+	assert.Contains(t, s, `project: "myapp"`)
+	assert.Contains(t, s, `test: "go test ./..."`)
+	assert.Contains(t, s, `lint: "golangci-lint run ./..."`)
 }
 
 func TestGenerate_SkipsExistingFiles(t *testing.T) {
@@ -101,24 +87,14 @@ func TestGenerate_SkipsExistingFiles(t *testing.T) {
 	}
 
 	result1, err := Generate(dir, info)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result1.Skipped) != 0 {
-		t.Errorf("first run should skip nothing, got %v", result1.Skipped)
-	}
+	require.NoError(t, err)
+	assert.Empty(t, result1.Skipped)
 
 	result2, err := Generate(dir, info)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if len(result2.Created) != 0 {
-		t.Errorf("second run should create nothing, got %v", result2.Created)
-	}
-	if len(result2.Skipped) < 10 {
-		t.Errorf("second run should skip at least 10 files, got %d: %v", len(result2.Skipped), result2.Skipped)
-	}
+	assert.Empty(t, result2.Created)
+	assert.GreaterOrEqual(t, len(result2.Skipped), 10)
 }
 
 func TestGenerate_GitignoreIdempotent(t *testing.T) {
@@ -132,26 +108,19 @@ func TestGenerate_GitignoreIdempotent(t *testing.T) {
 		BaseImage:      "node:22-bookworm",
 	}
 
-	if _, err := Generate(dir, info); err != nil {
-		t.Fatal(err)
-	}
+	_, err := Generate(dir, info)
+	require.NoError(t, err)
 
 	content1, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if _, err := Generate(dir, info); err != nil {
-		t.Fatal(err)
-	}
+	_, err = Generate(dir, info)
+	require.NoError(t, err)
+
 	content2, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if !bytes.Equal(content1, content2) {
-		t.Errorf("gitignore should be idempotent:\nfirst:\n%s\nsecond:\n%s", content1, content2)
-	}
+	assert.Equal(t, content1, content2)
 }
 
 func TestGenerate_GitignoreAppendsToExisting(t *testing.T) {
@@ -168,25 +137,16 @@ func TestGenerate_GitignoreAppendsToExisting(t *testing.T) {
 		BaseImage:      "node:22-bookworm",
 	}
 
-	if _, err := Generate(dir, info); err != nil {
-		t.Fatal(err)
-	}
+	_, err := Generate(dir, info)
+	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s := string(content)
 
-	if !strings.HasPrefix(s, existing) {
-		t.Error("existing .gitignore content should be preserved")
-	}
-	if !strings.Contains(s, ".ralph/logs/") {
-		t.Error("should append .ralph/logs/")
-	}
-	if !strings.Contains(s, ".env") {
-		t.Error("should append .env")
-	}
+	assert.True(t, strings.HasPrefix(s, existing), "existing .gitignore content should be preserved")
+	assert.Contains(t, s, ".ralph/logs/")
+	assert.Contains(t, s, ".env")
 }
 
 func TestGenerate_EntrypointIsExecutable(t *testing.T) {
@@ -200,17 +160,12 @@ func TestGenerate_EntrypointIsExecutable(t *testing.T) {
 		BaseImage:      "node:22-bookworm",
 	}
 
-	if _, err := Generate(dir, info); err != nil {
-		t.Fatal(err)
-	}
+	_, err := Generate(dir, info)
+	require.NoError(t, err)
 
 	fi, err := os.Stat(filepath.Join(dir, ".ralph", "docker", "entrypoint.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fi.Mode()&0o111 == 0 {
-		t.Error("entrypoint.sh should be executable")
-	}
+	require.NoError(t, err)
+	assert.NotZero(t, fi.Mode()&0o111, "entrypoint.sh should be executable")
 }
 
 func TestGenerate_DockerfileContent(t *testing.T) {
@@ -225,25 +180,16 @@ func TestGenerate_DockerfileContent(t *testing.T) {
 		BaseImage:       "node:22-bookworm",
 	}
 
-	if _, err := Generate(dir, info); err != nil {
-		t.Fatal(err)
-	}
+	_, err := Generate(dir, info)
+	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "docker", "Dockerfile"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s := string(content)
 
-	if !strings.Contains(s, "FROM node:22-bookworm") {
-		t.Error("Dockerfile should use base image")
-	}
-	if !strings.Contains(s, "uv python install 3.12") {
-		t.Error("Dockerfile should install Python version")
-	}
-	if !strings.Contains(s, "ralph") {
-		t.Error("Dockerfile should install ralph CLI")
-	}
+	assert.Contains(t, s, "FROM node:22-bookworm")
+	assert.Contains(t, s, "uv python install 3.12")
+	assert.Contains(t, s, "ralph")
 }
 
 func TestPrintSummary(t *testing.T) {
@@ -256,13 +202,7 @@ func TestPrintSummary(t *testing.T) {
 	PrintSummary(&buf, result)
 
 	output := buf.String()
-	if !strings.Contains(output, "created  .ralph/config.yaml") {
-		t.Error("should show created files")
-	}
-	if !strings.Contains(output, "exists   .env.example") {
-		t.Error("should show skipped files")
-	}
-	if !strings.Contains(output, "Next steps") {
-		t.Error("should show next steps")
-	}
+	assert.Contains(t, output, "created  .ralph/config.yaml")
+	assert.Contains(t, output, "exists   .env.example")
+	assert.Contains(t, output, "Next steps")
 }

@@ -2,8 +2,9 @@ package loop
 
 import (
 	"bytes"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/benwilkes9/ralph-cli/internal/stream"
 )
@@ -20,9 +21,7 @@ func TestRenderHeader(t *testing.T) {
 	out := buf.String()
 
 	for _, want := range []string{"━━━", "build", ".ralph/prompts/build.md", "feat/awesome", "10 iterations"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("RenderHeader missing %q in:\n%s", want, out)
-		}
+		assert.Contains(t, out, want)
 	}
 }
 
@@ -35,31 +34,21 @@ func TestRenderHeaderNoMax(t *testing.T) {
 		MaxIterations: 0,
 	}
 	RenderHeader(&buf, &opts)
-	out := buf.String()
-
-	if strings.Contains(out, "iterations") {
-		t.Errorf("RenderHeader should not show iterations line when MaxIterations=0, got:\n%s", out)
-	}
+	assert.NotContains(t, buf.String(), "iterations")
 }
 
 func TestRenderHeaderPlanColor(t *testing.T) {
 	var buf bytes.Buffer
 	opts := Options{Mode: ModePlan, PromptFile: "p.md", Branch: "main"}
 	RenderHeader(&buf, &opts)
-
-	if !strings.Contains(buf.String(), stream.BoldCyan) {
-		t.Error("RenderHeader for plan mode should use BoldCyan")
-	}
+	assert.Contains(t, buf.String(), stream.BoldCyan)
 }
 
 func TestRenderHeaderBuildColor(t *testing.T) {
 	var buf bytes.Buffer
 	opts := Options{Mode: ModeBuild, PromptFile: "b.md", Branch: "main"}
 	RenderHeader(&buf, &opts)
-
-	if !strings.Contains(buf.String(), stream.BoldGreen) {
-		t.Error("RenderHeader for build mode should use BoldGreen")
-	}
+	assert.Contains(t, buf.String(), stream.BoldGreen)
 }
 
 func TestRenderBanner(t *testing.T) {
@@ -68,9 +57,7 @@ func TestRenderBanner(t *testing.T) {
 	out := buf.String()
 
 	for _, want := range []string{"BUILD", "#1", "╔", "╚"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("RenderBanner missing %q in:\n%s", want, out)
-		}
+		assert.Contains(t, out, want)
 	}
 }
 
@@ -79,12 +66,8 @@ func TestRenderBannerPlan(t *testing.T) {
 	RenderBanner(&buf, ModePlan, 3)
 	out := buf.String()
 
-	if !strings.Contains(out, "PLAN") {
-		t.Error("RenderBanner for plan mode should contain PLAN")
-	}
-	if !strings.Contains(out, stream.BoldCyan) {
-		t.Error("RenderBanner for plan mode should use BoldCyan")
-	}
+	assert.Contains(t, out, "PLAN")
+	assert.Contains(t, out, stream.BoldCyan)
 }
 
 func TestRenderIterationSummary(t *testing.T) {
@@ -97,9 +80,7 @@ func TestRenderIterationSummary(t *testing.T) {
 	out := buf.String()
 
 	for _, want := range []string{"85.2k", "200.0k", "42%", "$0.0234", "logs/20250101-120000.jsonl"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("RenderIterationSummary missing %q in:\n%s", want, out)
-		}
+		assert.Contains(t, out, want)
 	}
 }
 
@@ -110,11 +91,7 @@ func TestRenderIterationSummaryZeroCost(t *testing.T) {
 		Cost:        0,
 	}
 	RenderIterationSummary(&buf, stats, "logs/test.jsonl")
-	out := buf.String()
-
-	if strings.Contains(out, "$") {
-		t.Errorf("RenderIterationSummary should not show $ when cost is 0, got:\n%s", out)
-	}
+	assert.NotContains(t, buf.String(), "$")
 }
 
 func TestRenderStaleWarning(t *testing.T) {
@@ -122,15 +99,9 @@ func TestRenderStaleWarning(t *testing.T) {
 	RenderStaleWarning(&buf, 1, 2)
 	out := buf.String()
 
-	if !strings.Contains(out, "No new commits") {
-		t.Error("RenderStaleWarning should contain 'No new commits'")
-	}
-	if !strings.Contains(out, "1/2") {
-		t.Error("RenderStaleWarning should contain count/max")
-	}
-	if !strings.Contains(out, stream.BoldYellow) {
-		t.Error("RenderStaleWarning should use BoldYellow")
-	}
+	assert.Contains(t, out, "No new commits")
+	assert.Contains(t, out, "1/2")
+	assert.Contains(t, out, stream.BoldYellow)
 }
 
 func TestRenderStaleAbort(t *testing.T) {
@@ -138,12 +109,8 @@ func TestRenderStaleAbort(t *testing.T) {
 	RenderStaleAbort(&buf, 2)
 	out := buf.String()
 
-	if !strings.Contains(out, "Stale loop detected") {
-		t.Error("RenderStaleAbort should contain 'Stale loop detected'")
-	}
-	if !strings.Contains(out, stream.BoldRed) {
-		t.Error("RenderStaleAbort should use BoldRed")
-	}
+	assert.Contains(t, out, "Stale loop detected")
+	assert.Contains(t, out, stream.BoldRed)
 }
 
 func TestRenderMaxIterations(t *testing.T) {
@@ -151,55 +118,37 @@ func TestRenderMaxIterations(t *testing.T) {
 	RenderMaxIterations(&buf, 5)
 	out := buf.String()
 
-	if !strings.Contains(out, "Reached max iterations: 5") {
-		t.Errorf("RenderMaxIterations should contain message, got:\n%s", out)
-	}
-	if !strings.Contains(out, stream.BoldYellow) {
-		t.Error("RenderMaxIterations should use BoldYellow")
-	}
+	assert.Contains(t, out, "Reached max iterations: 5")
+	assert.Contains(t, out, stream.BoldYellow)
 }
 
 func TestModeColor(t *testing.T) {
-	if got := modeColor(ModePlan); got != stream.BoldCyan {
-		t.Errorf("modeColor(plan) = %q, want BoldCyan", got)
-	}
-	if got := modeColor(ModeBuild); got != stream.BoldGreen {
-		t.Errorf("modeColor(build) = %q, want BoldGreen", got)
-	}
+	assert.Equal(t, stream.BoldCyan, modeColor(ModePlan))
+	assert.Equal(t, stream.BoldGreen, modeColor(ModeBuild))
 }
 
 func TestStaleDetectorIntegration(t *testing.T) {
 	d := NewStaleDetector(2)
 
-	// Seed
+	// Seed: first call always returns not-stale
 	abort, count := d.Check("aaa")
-	if abort || count != 0 {
-		t.Fatal("seed should not be stale")
-	}
+	assert.False(t, abort, "seed should not abort")
+	assert.Equal(t, 0, count, "seed should have count 0")
 
-	// Change
+	// HEAD changes: stale count resets
 	abort, count = d.Check("bbb")
-	if abort || count != 0 {
-		t.Fatal("change should reset stale")
-	}
+	assert.False(t, abort, "change should not abort")
+	assert.Equal(t, 0, count, "change should reset count")
 
-	// Stale 1
+	// Same HEAD: stale count 1
 	abort, count = d.Check("bbb")
-	if abort {
-		t.Fatal("should not abort at stale count 1")
-	}
-	if count != 1 {
-		t.Fatalf("expected stale count 1, got %d", count)
-	}
+	assert.False(t, abort, "should not abort at stale count 1")
+	assert.Equal(t, 1, count)
 
-	// Stale 2 → abort
+	// Same HEAD again: stale count 2 → abort
 	abort, count = d.Check("bbb")
-	if !abort {
-		t.Fatal("should abort at stale count 2")
-	}
-	if count != 2 {
-		t.Fatalf("expected stale count 2, got %d", count)
-	}
+	assert.True(t, abort, "should abort at stale count 2")
+	assert.Equal(t, 2, count)
 }
 
 func TestStaleDetectorReset(t *testing.T) {
@@ -210,16 +159,11 @@ func TestStaleDetectorReset(t *testing.T) {
 
 	// HEAD changes → count resets
 	abort, count := d.Check("bbb")
-	if abort || count != 0 {
-		t.Fatalf("expected reset after HEAD change, got abort=%v count=%d", abort, count)
-	}
+	assert.False(t, abort)
+	assert.Equal(t, 0, count)
 
 	// Stale again from 0
 	abort, count = d.Check("bbb")
-	if abort {
-		t.Fatal("should not abort at stale count 1 after reset")
-	}
-	if count != 1 {
-		t.Fatalf("expected stale count 1, got %d", count)
-	}
+	assert.False(t, abort, "should not abort at stale count 1 after reset")
+	assert.Equal(t, 1, count)
 }

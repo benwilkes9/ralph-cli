@@ -1,6 +1,10 @@
 package git
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestSanitizeBranch(t *testing.T) {
 	tests := []struct {
@@ -22,9 +26,7 @@ func TestSanitizeBranch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			got := SanitizeBranch(tt.input)
-			if got != tt.want {
-				t.Errorf("SanitizeBranch(%q) = %q, want %q", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -54,9 +56,7 @@ func TestIsProtectedBranch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.branch, func(t *testing.T) {
 			got := IsProtectedBranch(tt.branch, tt.protected)
-			if got != tt.want {
-				t.Errorf("IsProtectedBranch(%q, %v) = %v, want %v", tt.branch, tt.protected, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -98,6 +98,17 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 Use scope when relevant: `feat(stream): add color support`
 Single line only. No body, no `Co-Authored-By` trailer.
 
+## Testing Conventions
+
+- Test behaviour, not implementation — tests should survive internal refactoring
+- Use table-driven tests for input/output variance; group integration-style assertions by concern
+- Test at the package boundary via exported functions; don't reach into unexported internals
+- Prioritise business logic, edge cases, and error paths (`error` returns are cheap to test in Go)
+- Target ~80% coverage per business logic package; exclude CLI entrypoints and thin adapters
+- Use `testify/assert` for assertions, `testify/require` to fail fast on preconditions
+- Prefer real temp dirs (`t.TempDir()`) over filesystem mocks
+- Fake the process boundary (git, docker) via injected interfaces, not by mocking internals
+
 ## Conventions
 
 - Keep packages focused — one responsibility per package

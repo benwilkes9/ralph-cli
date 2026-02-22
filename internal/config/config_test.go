@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoad_Valid(t *testing.T) {
@@ -19,15 +22,9 @@ phases:
 `)
 
 	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg.Project != "test" {
-		t.Errorf("Project = %q, want %q", cfg.Project, "test")
-	}
-	if cfg.Phases.Plan.MaxIterations != 5 {
-		t.Errorf("Plan.MaxIterations = %d, want 5", cfg.Phases.Plan.MaxIterations)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "test", cfg.Project)
+	assert.Equal(t, 5, cfg.Phases.Plan.MaxIterations)
 }
 
 func TestLoad_DefaultValues(t *testing.T) {
@@ -35,21 +32,11 @@ func TestLoad_DefaultValues(t *testing.T) {
 	writeConfig(t, dir, "project: test\n")
 
 	cfg, err := Load(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg.Agent != "claude" {
-		t.Errorf("Agent = %q, want %q", cfg.Agent, "claude")
-	}
-	if cfg.Phases.Plan.MaxIterations != 5 {
-		t.Errorf("Plan.MaxIterations = %d, want default 5", cfg.Phases.Plan.MaxIterations)
-	}
-	if cfg.Phases.Build.MaxIterations != 20 {
-		t.Errorf("Build.MaxIterations = %d, want default 20", cfg.Phases.Build.MaxIterations)
-	}
-	if len(cfg.ProtectedBranches) != 2 || cfg.ProtectedBranches[0] != "main" || cfg.ProtectedBranches[1] != "master" {
-		t.Errorf("ProtectedBranches = %v, want [main master]", cfg.ProtectedBranches)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "claude", cfg.Agent)
+	assert.Equal(t, 5, cfg.Phases.Plan.MaxIterations)
+	assert.Equal(t, 20, cfg.Phases.Build.MaxIterations)
+	assert.Equal(t, []string{"main", "master"}, cfg.ProtectedBranches)
 }
 
 func TestLoad_NegativeIterations(t *testing.T) {
@@ -61,12 +48,8 @@ phases:
 `)
 
 	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for negative max_iterations")
-	}
-	if !strings.Contains(err.Error(), "non-negative") {
-		t.Errorf("error = %q, want mention of non-negative", err.Error())
-	}
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "non-negative")
 }
 
 func TestLoad_ExcessiveIterations(t *testing.T) {
@@ -78,40 +61,25 @@ phases:
 `)
 
 	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for excessive max_iterations")
-	}
-	if !strings.Contains(err.Error(), "exceeds maximum") {
-		t.Errorf("error = %q, want mention of exceeds maximum", err.Error())
-	}
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "exceeds maximum")
 }
 
 func TestLoad_FileTooLarge(t *testing.T) {
 	dir := t.TempDir()
 	configDir := filepath.Join(dir, ".ralph")
-	if err := os.MkdirAll(configDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	// Write a file larger than 64 KiB
+	require.NoError(t, os.MkdirAll(configDir, 0o750))
 	large := strings.Repeat("x", maxConfigSize+1)
-	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(large), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(large), 0o600))
 
 	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for oversized config")
-	}
-	if !strings.Contains(err.Error(), "too large") {
-		t.Errorf("error = %q, want mention of too large", err.Error())
-	}
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "too large")
 }
 
 func TestLoad_MissingFile(t *testing.T) {
 	_, err := Load(t.TempDir())
-	if err == nil {
-		t.Fatal("expected error for missing config")
-	}
+	require.Error(t, err)
 }
 
 func TestLoad_InvalidYAML(t *testing.T) {
@@ -119,9 +87,7 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	writeConfig(t, dir, ":\n  bad:\nyaml: [")
 
 	_, err := Load(dir)
-	if err == nil {
-		t.Fatal("expected error for invalid YAML")
-	}
+	require.Error(t, err)
 }
 
 func TestPlanPathForBranch_DefaultDir(t *testing.T) {
@@ -129,10 +95,7 @@ func TestPlanPathForBranch_DefaultDir(t *testing.T) {
 	cfg.applyDefaults()
 
 	got := cfg.PlanPathForBranch("feature-auth-flow")
-	want := ".ralph/plans/IMPLEMENTATION_PLAN_feature-auth-flow.md"
-	if got != want {
-		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
-	}
+	assert.Equal(t, ".ralph/plans/IMPLEMENTATION_PLAN_feature-auth-flow.md", got)
 }
 
 func TestPlanPathForBranch_CustomFile(t *testing.T) {
@@ -143,10 +106,7 @@ func TestPlanPathForBranch_CustomFile(t *testing.T) {
 	}
 
 	got := cfg.PlanPathForBranch("feat-login")
-	want := "my-plan_feat-login.md"
-	if got != want {
-		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
-	}
+	assert.Equal(t, "my-plan_feat-login.md", got)
 }
 
 func TestPlanPathForBranch_CustomDir(t *testing.T) {
@@ -157,10 +117,7 @@ func TestPlanPathForBranch_CustomDir(t *testing.T) {
 	}
 
 	got := cfg.PlanPathForBranch("fix-bug-123")
-	want := "plans/IMPLEMENTATION_PLAN_fix-bug-123.md"
-	if got != want {
-		t.Errorf("PlanPathForBranch = %q, want %q", got, want)
-	}
+	assert.Equal(t, "plans/IMPLEMENTATION_PLAN_fix-bug-123.md", got)
 }
 
 func writeConfig(t *testing.T, dir, content string) {

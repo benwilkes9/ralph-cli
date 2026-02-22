@@ -5,14 +5,15 @@ import (
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func openFixture(t *testing.T, name string) *os.File {
 	t.Helper()
 	f, err := os.Open(name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		if err := f.Close(); err != nil {
 			t.Error(err)
@@ -31,15 +32,11 @@ func TestParseFullIteration(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		events = append(events, evt)
 	}
 
-	if len(events) != 23 {
-		t.Fatalf("expected 23 events, got %d", len(events))
-	}
+	assert.Len(t, events, 23)
 }
 
 func TestParseEventTypes(t *testing.T) {
@@ -52,24 +49,14 @@ func TestParseEventTypes(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		typeCounts[evt.Type]++
 	}
 
-	if typeCounts["system"] < 1 {
-		t.Error("expected at least 1 system event")
-	}
-	if typeCounts[eventAssistant] < 1 {
-		t.Error("expected at least 1 assistant event")
-	}
-	if typeCounts[eventUser] < 1 {
-		t.Error("expected at least 1 user event")
-	}
-	if typeCounts[eventResult] != 1 {
-		t.Errorf("expected exactly 1 result event, got %d", typeCounts[eventResult])
-	}
+	assert.GreaterOrEqual(t, typeCounts["system"], 1)
+	assert.GreaterOrEqual(t, typeCounts[eventAssistant], 1)
+	assert.GreaterOrEqual(t, typeCounts[eventUser], 1)
+	assert.Equal(t, 1, typeCounts[eventResult])
 }
 
 func TestParseAssistantMessage(t *testing.T) {
@@ -81,25 +68,15 @@ func TestParseAssistantMessage(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if evt.Type != eventAssistant {
 			continue
 		}
 
-		if evt.Message == nil {
-			t.Fatal("assistant event has nil Message")
-		}
-		if evt.Message.Role != eventAssistant {
-			t.Errorf("expected role=assistant, got %q", evt.Message.Role)
-		}
-		if evt.Message.Model == "" {
-			t.Error("expected non-empty model")
-		}
-		if len(evt.Message.Content) == 0 {
-			t.Error("expected at least one content block")
-		}
+		require.NotNil(t, evt.Message)
+		assert.Equal(t, eventAssistant, evt.Message.Role)
+		assert.NotEmpty(t, evt.Message.Model)
+		assert.NotEmpty(t, evt.Message.Content)
 		return // only check first assistant event
 	}
 }
@@ -114,9 +91,7 @@ func TestParseUsageFields(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if evt.Type != eventAssistant || evt.Message == nil || evt.Message.Usage == nil {
 			continue
 		}
@@ -127,15 +102,11 @@ func TestParseUsageFields(t *testing.T) {
 			continue
 		}
 		foundUsage = true
-
-		if u.CacheCreationInputTokens == 0 && u.CacheReadInputTokens == 0 && u.InputTokens == 0 {
-			t.Error("expected at least one positive token field")
-		}
+		assert.True(t, u.CacheCreationInputTokens > 0 || u.CacheReadInputTokens > 0 || u.InputTokens > 0,
+			"expected at least one positive token field")
 		break
 	}
-	if !foundUsage {
-		t.Error("no assistant event with usage found")
-	}
+	assert.True(t, foundUsage, "no assistant event with usage found")
 }
 
 func TestParseResultEvent(t *testing.T) {
@@ -147,16 +118,12 @@ func TestParseResultEvent(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if evt.Type != eventResult {
 			continue
 		}
 
-		if evt.TotalCostUSD <= 0 {
-			t.Errorf("expected positive total_cost_usd, got %f", evt.TotalCostUSD)
-		}
+		assert.Greater(t, evt.TotalCostUSD, 0.0)
 		return
 	}
 	t.Error("no result event found")
@@ -171,9 +138,7 @@ func TestParseToolUseResult(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if evt.Type != eventUser || evt.ToolUseResult == nil {
 			continue
 		}
@@ -192,24 +157,16 @@ func TestParseSubagentResult(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if evt.Type != eventUser || evt.ToolUseResult == nil || evt.ToolUseResult.TotalTokens == 0 {
 			continue
 		}
 		foundSubagent = true
 		tr := evt.ToolUseResult
-		if tr.TotalTokens <= 0 {
-			t.Error("expected positive totalTokens")
-		}
-		if tr.TotalDurationMs <= 0 {
-			t.Error("expected positive totalDurationMs")
-		}
+		assert.Greater(t, tr.TotalTokens, 0)
+		assert.Greater(t, tr.TotalDurationMs, 0)
 	}
-	if !foundSubagent {
-		t.Error("no subagent result found in with_subagents.jsonl")
-	}
+	assert.True(t, foundSubagent, "no subagent result found in with_subagents.jsonl")
 }
 
 func TestParseMalformedLines(t *testing.T) {
@@ -222,16 +179,12 @@ func TestParseMalformedLines(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		events = append(events, evt)
 	}
 
 	// malformed.jsonl has: bad json, valid line, empty line, truncated json, valid user event
-	if len(events) != 2 {
-		t.Errorf("expected 2 valid events from malformed.jsonl, got %d", len(events))
-	}
+	assert.Len(t, events, 2)
 }
 
 func TestParseToolUseContent(t *testing.T) {
@@ -243,20 +196,14 @@ func TestParseToolUseContent(t *testing.T) {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if evt.Type != eventAssistant || evt.Message == nil {
 			continue
 		}
 		for _, block := range evt.Message.Content {
 			if block.Type == contentToolUse {
-				if block.Name == "" {
-					t.Error("tool_use block has empty name")
-				}
-				if len(block.Input) == 0 {
-					t.Error("tool_use block has empty input")
-				}
+				assert.NotEmpty(t, block.Name, "tool_use block has empty name")
+				assert.NotEmpty(t, block.Input, "tool_use block has empty input")
 				return
 			}
 		}

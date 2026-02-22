@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/benwilkes9/ralph-cli/internal/git"
 	logfile "github.com/benwilkes9/ralph-cli/internal/log"
 	"github.com/benwilkes9/ralph-cli/internal/state"
 	"github.com/benwilkes9/ralph-cli/internal/stream"
@@ -40,10 +39,14 @@ type Options struct {
 
 // Run executes the main iteration loop.
 func Run(ctx context.Context, opts *Options, w io.Writer) error {
+	return run(ctx, opts, w, &realGitClient{}, &realClaudeRunner{})
+}
+
+func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claudeCl ClaudeRunner) error {
 	RenderHeader(w, opts)
 
 	// Seed stale detector with initial HEAD.
-	head, err := git.Head()
+	head, err := gitCl.Head()
 	if err != nil {
 		return fmt.Errorf("getting initial HEAD: %w", err)
 	}
@@ -69,7 +72,7 @@ func Run(ctx context.Context, opts *Options, w io.Writer) error {
 			break
 		}
 
-		headBefore, err := git.Head()
+		headBefore, err := gitCl.Head()
 		if err != nil {
 			return fmt.Errorf("getting HEAD before iteration: %w", err)
 		}
@@ -81,7 +84,7 @@ func Run(ctx context.Context, opts *Options, w io.Writer) error {
 			return fmt.Errorf("creating log writer: %w", err)
 		}
 
-		iterStats, runErr := runClaude(ctx, opts, logW, w)
+		iterStats, runErr := claudeCl.Run(ctx, opts, logW, w)
 		logW.Close() //nolint:errcheck // best-effort log close
 		logPaths = append(logPaths, logW.Path())
 
@@ -95,15 +98,15 @@ func Run(ctx context.Context, opts *Options, w io.Writer) error {
 		}
 
 		// Push with fallback to --set-upstream.
-		if pushErr := git.Push(opts.Branch); pushErr != nil {
+		if pushErr := gitCl.Push(opts.Branch); pushErr != nil {
 			RenderPushFallback(w)
-			if upErr := git.PushSetUpstream(opts.Branch); upErr != nil {
+			if upErr := gitCl.PushSetUpstream(opts.Branch); upErr != nil {
 				fmt.Fprintf(w, "%sPush failed: %s%s\n", stream.Dim, upErr, stream.Reset) //nolint:errcheck // display-only
 			}
 		}
 
 		// Check for stale iterations.
-		headAfter, err := git.Head()
+		headAfter, err := gitCl.Head()
 		if err != nil {
 			return fmt.Errorf("getting HEAD after iteration: %w", err)
 		}
@@ -121,7 +124,7 @@ func Run(ctx context.Context, opts *Options, w io.Writer) error {
 		}
 	}
 
-	summary.PrintBox(cumStats, time.Since(startTime))
+	summary.PrintBox(w, cumStats, time.Since(startTime))
 	saveState(opts, cumStats, startTime, logPaths, cancelled, staleAborted)
 
 	if staleAborted {
@@ -181,7 +184,7 @@ func claudeArgs() []string {
 }
 
 // runClaude invokes the claude CLI, tees output to the log writer, and returns iteration stats.
-func runClaude(ctx context.Context, opts *Options, logW *logfile.Writer, displayW io.Writer) (*stream.IterationStats, error) {
+func runClaude(ctx context.Context, opts *Options, logW, displayW io.Writer) (*stream.IterationStats, error) {
 	args := claudeArgs()
 
 	cmd := exec.CommandContext(ctx, "claude", args...) //nolint:gosec // args are static

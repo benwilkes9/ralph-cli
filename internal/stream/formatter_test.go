@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatTokensFloor(t *testing.T) {
@@ -28,9 +31,7 @@ func TestFormatTokensFloor(t *testing.T) {
 
 	for _, tt := range tests {
 		got := FormatTokens(tt.input)
-		if got != tt.want {
-			t.Errorf("FormatTokens(%d) = %q, want %q", tt.input, got, tt.want)
-		}
+		assert.Equal(t, tt.want, got, "FormatTokens(%d)", tt.input)
 	}
 }
 
@@ -48,20 +49,12 @@ func TestFormatTextBlock(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, f.Format(evt))
 
 	got := buf.String()
-	if !strings.Contains(got, "Hello world") {
-		t.Errorf("expected output to contain 'Hello world', got %q", got)
-	}
-	if !strings.Contains(got, Bold) {
-		t.Error("expected bold ANSI code in text output")
-	}
-	if !strings.Contains(got, White) {
-		t.Error("expected white ANSI code in text output")
-	}
+	assert.Contains(t, got, "Hello world")
+	assert.Contains(t, got, Bold)
+	assert.Contains(t, got, White)
 }
 
 func TestFormatRegularToolUse(t *testing.T) {
@@ -82,20 +75,12 @@ func TestFormatRegularToolUse(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, f.Format(evt))
 
 	got := buf.String()
-	if !strings.Contains(got, "· Read") {
-		t.Errorf("expected '· Read' in output, got %q", got)
-	}
-	if !strings.Contains(got, "/workspace/repo/main.go") {
-		t.Errorf("expected file_path in output, got %q", got)
-	}
-	if !strings.Contains(got, Dim) {
-		t.Error("expected dim ANSI code in tool output")
-	}
+	assert.Contains(t, got, "· Read")
+	assert.Contains(t, got, "/workspace/repo/main.go")
+	assert.Contains(t, got, Dim)
 }
 
 func TestFormatTaskToolUse(t *testing.T) {
@@ -116,20 +101,12 @@ func TestFormatTaskToolUse(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, f.Format(evt))
 
 	got := buf.String()
-	if !strings.Contains(got, "▶ Bash") {
-		t.Errorf("expected '▶ Bash' in output, got %q", got)
-	}
-	if !strings.Contains(got, `"Run all tests"`) {
-		t.Errorf("expected quoted description in output, got %q", got)
-	}
-	if !strings.Contains(got, BoldCyan) {
-		t.Error("expected BoldCyan ANSI code in Task output")
-	}
+	assert.Contains(t, got, "▶ Bash")
+	assert.Contains(t, got, `"Run all tests"`)
+	assert.Contains(t, got, BoldCyan)
 }
 
 func TestFormatTaskWithModelHint(t *testing.T) {
@@ -150,17 +127,11 @@ func TestFormatTaskWithModelHint(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, f.Format(evt))
 
 	got := buf.String()
-	if !strings.Contains(got, "model=opus") {
-		t.Errorf("expected 'model=opus' in output, got %q", got)
-	}
-	if !strings.Contains(got, "max_turns=5") {
-		t.Errorf("expected 'max_turns=5' in output, got %q", got)
-	}
+	assert.Contains(t, got, "model=opus")
+	assert.Contains(t, got, "max_turns=5")
 }
 
 func TestFormatSubagentCompleted(t *testing.T) {
@@ -177,26 +148,14 @@ func TestFormatSubagentCompleted(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, f.Format(evt))
 
 	got := buf.String()
-	if !strings.Contains(got, "✓") {
-		t.Error("expected green checkmark in completed subagent output")
-	}
-	if !strings.Contains(got, Green) {
-		t.Error("expected green ANSI code")
-	}
-	if !strings.Contains(got, "19s") {
-		t.Errorf("expected '19s' duration, got %q", got)
-	}
-	if !strings.Contains(got, "3 tool calls") {
-		t.Errorf("expected '3 tool calls', got %q", got)
-	}
-	if !strings.Contains(got, "8.7k tokens") {
-		t.Errorf("expected '8.7k tokens', got %q", got)
-	}
+	assert.Contains(t, got, "✓")
+	assert.Contains(t, got, Green)
+	assert.Contains(t, got, "19s")
+	assert.Contains(t, got, "3 tool calls")
+	assert.Contains(t, got, "8.7k tokens")
 }
 
 func TestFormatSubagentFailed(t *testing.T) {
@@ -211,20 +170,12 @@ func TestFormatSubagentFailed(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, f.Format(evt))
 
 	got := buf.String()
-	if !strings.Contains(got, "✗") {
-		t.Error("expected red X in failed subagent output")
-	}
-	if !strings.Contains(got, "error") {
-		t.Error("expected status text in failed subagent output")
-	}
-	if !strings.Contains(got, BoldRed) {
-		t.Error("expected BoldRed ANSI code")
-	}
+	assert.Contains(t, got, "✗")
+	assert.Contains(t, got, "error")
+	assert.Contains(t, got, BoldRed)
 }
 
 func TestFormatIgnoresSystemAndResult(t *testing.T) {
@@ -234,12 +185,8 @@ func TestFormatIgnoresSystemAndResult(t *testing.T) {
 	for _, evtType := range []string{"system", "result"} {
 		buf.Reset()
 		evt := &Event{Type: evtType}
-		if err := f.Format(evt); err != nil {
-			t.Fatal(err)
-		}
-		if buf.Len() != 0 {
-			t.Errorf("expected no output for %q event, got %q", evtType, buf.String())
-		}
+		require.NoError(t, f.Format(evt))
+		assert.Equal(t, 0, buf.Len(), "expected no output for %q event", evtType)
 	}
 }
 
@@ -254,12 +201,8 @@ func TestFormatUserWithoutTotalTokens(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
-	if buf.Len() != 0 {
-		t.Errorf("expected no output for regular user event, got %q", buf.String())
-	}
+	require.NoError(t, f.Format(evt))
+	assert.Equal(t, 0, buf.Len())
 }
 
 func TestExtractParamPriority(t *testing.T) {
@@ -298,9 +241,7 @@ func TestExtractParamPriority(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := extractParam(json.RawMessage(tt.input))
-			if got != tt.want {
-				t.Errorf("extractParam(%s) = %q, want %q", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -310,12 +251,8 @@ func TestExtractParamTruncation(t *testing.T) {
 	input := `{"file_path":"` + longPath + `"}`
 	got := extractParam(json.RawMessage(input))
 
-	if len([]rune(got)) > 61 { // 60 + ellipsis
-		t.Errorf("expected truncation at 60 chars + ellipsis, got length %d: %q", len([]rune(got)), got)
-	}
-	if !strings.HasSuffix(got, "…") {
-		t.Errorf("expected ellipsis at end, got %q", got)
-	}
+	assert.LessOrEqual(t, len([]rune(got)), 61, "expected truncation at 60 chars + ellipsis") // 60 + ellipsis
+	assert.True(t, strings.HasSuffix(got, "…"), "expected ellipsis at end, got %q", got)
 }
 
 func TestFormatTaskFallbackSubagentType(t *testing.T) {
@@ -336,12 +273,6 @@ func TestFormatTaskFallbackSubagentType(t *testing.T) {
 		},
 	}
 
-	if err := f.Format(evt); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "▶ agent") {
-		t.Errorf("expected fallback '▶ agent' when no subagent_type, got %q", got)
-	}
+	require.NoError(t, f.Format(evt))
+	assert.Contains(t, buf.String(), "▶ agent")
 }

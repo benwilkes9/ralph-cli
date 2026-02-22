@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/huh"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func assertOptionValue(t *testing.T, opt huh.Option[string], want string) {
 	t.Helper()
-	if opt.Value != want {
-		t.Errorf("option value = %q, want %q", opt.Value, want)
-	}
+	assert.Equal(t, want, opt.Value)
 }
 
 func TestRunCmdOptions_UV(t *testing.T) {
@@ -18,9 +18,7 @@ func TestRunCmdOptions_UV(t *testing.T) {
 	opts := runCmdOptions(info)
 
 	// 2 suggestions + custom
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 options, got %d", len(opts))
-	}
+	require.Len(t, opts, 3)
 	assertOptionValue(t, opts[0], "uv run uvicorn myapp.main:app")
 	assertOptionValue(t, opts[1], "uv run python -m myapp")
 	assertOptionValue(t, opts[len(opts)-1], customSentinel)
@@ -30,9 +28,7 @@ func TestRunCmdOptions_Go(t *testing.T) {
 	info := &ProjectInfo{ProjectName: "myapp", PackageManager: PmGo}
 	opts := runCmdOptions(info)
 
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 options, got %d", len(opts))
-	}
+	require.Len(t, opts, 3)
 	assertOptionValue(t, opts[0], "go run ./cmd/myapp")
 	assertOptionValue(t, opts[1], "go run .")
 }
@@ -41,9 +37,7 @@ func TestRunCmdOptions_NPM(t *testing.T) {
 	info := &ProjectInfo{ProjectName: "myapp", PackageManager: PmNPM}
 	opts := runCmdOptions(info)
 
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 options, got %d", len(opts))
-	}
+	require.Len(t, opts, 3)
 	assertOptionValue(t, opts[0], "npm start")
 	assertOptionValue(t, opts[1], "npm run dev")
 }
@@ -52,9 +46,7 @@ func TestRunCmdOptions_Unknown(t *testing.T) {
 	info := &ProjectInfo{ProjectName: "myapp", PackageManager: PmUnknown}
 	opts := runCmdOptions(info)
 
-	if len(opts) != 1 {
-		t.Fatalf("expected 1 option (custom only), got %d", len(opts))
-	}
+	require.Len(t, opts, 1, "expected 1 option (custom only)")
 	assertOptionValue(t, opts[0], customSentinel)
 }
 
@@ -63,9 +55,7 @@ func TestGoalOptions_Python(t *testing.T) {
 	opts := goalOptions(info)
 
 	// 1 language-specific + learning spike + custom
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 options, got %d", len(opts))
-	}
+	require.Len(t, opts, 3)
 	assertOptionValue(t, opts[len(opts)-1], customSentinel)
 }
 
@@ -74,28 +64,20 @@ func TestGoalOptions_Unknown(t *testing.T) {
 	opts := goalOptions(info)
 
 	// learning spike + custom
-	if len(opts) != 2 {
-		t.Fatalf("expected 2 options, got %d", len(opts))
-	}
+	require.Len(t, opts, 2)
 	assertOptionValue(t, opts[len(opts)-1], customSentinel)
 }
 
 func TestRunCmdTitle_WithExample(t *testing.T) {
 	info := &ProjectInfo{ProjectName: "myapp", PackageManager: PmGo}
 	title := runCmdTitle(info)
-
-	if title != "How do you start the application? (e.g. go run ./cmd/myapp)" {
-		t.Errorf("unexpected title: %s", title)
-	}
+	assert.Equal(t, "How do you start the application? (e.g. go run ./cmd/myapp)", title)
 }
 
 func TestRunCmdTitle_Unknown(t *testing.T) {
 	info := &ProjectInfo{ProjectName: "myapp", PackageManager: PmUnknown}
 	title := runCmdTitle(info)
-
-	if title != "How do you start the application?" {
-		t.Errorf("unexpected title: %s", title)
-	}
+	assert.Equal(t, "How do you start the application?", title)
 }
 
 func TestAllOptionSetsEndWithCustom(t *testing.T) {

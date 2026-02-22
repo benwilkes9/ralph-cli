@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -71,6 +72,19 @@ func initCmd() *cobra.Command {
 	}
 }
 
+// validateRelativePath returns an error if path is absolute or escapes the
+// repository root via ".." components.
+func validateRelativePath(flag, path string) error {
+	if filepath.IsAbs(path) {
+		return fmt.Errorf("--%s must be a relative path, got %q", flag, path)
+	}
+	clean := filepath.Clean(path)
+	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("--%s must stay within the repository root, got %q", flag, path)
+	}
+	return nil
+}
+
 // runParams holds resolved parameters shared by planCmd and applyCmd.
 type runParams struct {
 	maxVal   int
@@ -90,6 +104,11 @@ func resolveRunParams(cmd *cobra.Command) (*runParams, error) {
 	specsDir, err := cmd.Flags().GetString("specs")
 	if err != nil {
 		return nil, fmt.Errorf("reading --specs flag: %w", err)
+	}
+	if specsDir != "" {
+		if err := validateRelativePath("specs", specsDir); err != nil {
+			return nil, err
+		}
 	}
 
 	repoRoot, err := git.RepoRoot()

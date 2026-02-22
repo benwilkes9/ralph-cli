@@ -1,6 +1,11 @@
 package docker
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestRepoSlug(t *testing.T) {
 	tests := []struct {
@@ -60,17 +65,11 @@ func TestRepoSlug(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := RepoSlug(tt.input)
 			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got %q", got)
-				}
+				require.Error(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
