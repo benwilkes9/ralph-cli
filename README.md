@@ -1,14 +1,10 @@
 # Ralph CLI
 
-A Go CLI that runs plan/build loops using [Claude Code](https://docs.anthropic.com/en/docs/claude-code). AKA [Ralph Wiggum loops](https://ghuntley.com/ralph).
-
-## What's a Ralph Wiggum Loop?
-
-A genius technique for long-running agents that don't drift and don't use up the context window. Simply put Claude (or another agent) in a loop and give it the same prompt on every iteration, then marvel at the results. If you want to know more just read [the blog](https://ghuntley.com/ralph).
+A Go CLI that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) in a loop, AKA [Ralph Wiggum loops](https://ghuntley.com/ralph).
 
 ## Why did I make this CLI?
 
-I made this for myself! The [Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook) is great, but implementing it per repo or project is clunky and time consuming. This CLI is simply a convenience implementation of the Ralph Playbook. I use this instead of the [Anthropic plugin](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum) because that runs inside Claude, so the context window is an issue (for now!).
+I made this for myself! The [Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook) is great, but implementing it per repo or project is clunky and time-consuming. This CLI is simply an opinionated convenience implementation of the Ralph Playbook. I use this instead of the [Anthropic plugin](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum) because that runs inside Claude, so the context window is an issue (for now!). This loop runs outside of Claude. 
 
 ## Installation
 
@@ -56,21 +52,25 @@ ralph status
 ## IMPORTANT Guidelines & Considerations
 
 ### Specs
-The first fundamental idea is that you can implement a full feature in one shot in a single code repo (monolith, monorepo, microservice, whatever — a repo). You need well-written, clear, unambiguous specs. Think context engineering, spec-driven development — the results you get from Claude or any LLM will depend on the context you give it. SPEND TIME ON THIS.
+The first fundamental idea is that you can implement a full feature in one shot in a single code repo (a monolith, a monorepo, a microservice, whatever — but a single repo). You need well-written, clear, unambiguous specs. Think context engineering, spec-driven development — the results you get will depend on the context you give it.
 
 ### Prompts
-`ralph init` generates two prompt files: `.ralph/prompts/plan.md` and `.ralph/prompts/build.md`. These are the instructions that get fed to Claude on every iteration of the plan and build loops respectively. They're yours to customise — tweak them to suit your project, your conventions, your workflow. The defaults are a solid starting point but you'll get better results by tailoring them. SPEND TIME ON THIS.
+`ralph init` generates two prompt files: `.ralph/prompts/plan.md` and `.ralph/prompts/build.md`. These are the instructions that get fed to Claude on every iteration of the plan and build loops respectively. They're yours to customise — tweak them to suit your project, your conventions, your workflow. The defaults are just a solid starting point. 
 
 ### Guardrails / Backpressure
-The other fundamental idea is "backpressure" or "guardrails" — you need to give your build agents clear parameters and guidance. Automated testing, linting, security checking, etc. This is where you need to put your engineering hat on. If you're going to expect Claude to implement good quality code consistently, you need to tell it what good looks like. SPEND TIME ON THIS.
+The other fundamental idea is "backpressure" or "guardrails" — you need to give your build agents clear parameters and guidance. Automated determinsitic, testing, linting, security checking, etc. You need to do this for precommit hooks (as well as CI) so that the agent will review and fix before commiting. 
+
+There is also the `AGENTS.md`; this is also prepopulated depending on your tech stack, but again you need to review it and tailor it to your conventions, including the validation steps you expect the agent to run, which obviously needs to align with your precommit hooks. 
+
+This is where you need to put your engineering hat on. If you're going to expect Claude to implement good quality code consistently; you need to tell it what good looks like and put the guardrails in place.
 
 ### Token Use
-If you're coming from the "human in the loop" approach to agentic engineering — one task at a time — this will use a lot more tokens. And if you don't give it well-written, clear, unambiguous specs and clear guardrails then you will waste a lot of tokens! YOU HAVE BEEN WARNED!
+If you're coming from the "human in the loop" approach to agentic engineering — one task at a time — this will use a lot more tokens. And if you don't give it well-written, clear, unambiguous specs and clear guardrails then you will **waste a lot of tokens**! YOU HAVE BEEN WARNED!
 
 ### Monitoring
 The CLI gives you well-formatted output of what's going on — thinking, tool use, token use, results. It pays to monitor it closely, at least for the first few iterations.
 
-I think of all this as an implementation of the [four foundational agentic patterns](https://www.nibzard.com/agentic-handbook#foundational-patterns-you-can-use-immediately): plan then execute; inversion of control; reflection loop; action trace monitoring & interruption.
+I think of all of the above as an implementation of the [four foundational agentic patterns](https://www.nibzard.com/agentic-handbook#foundational-patterns-you-can-use-immediately): plan then execute; inversion of control; reflection loop; action trace monitoring & interruption. Running in a loop is not a silver bullet - it needs engineering.
 
 ### Branch-Aware Conventions
 
