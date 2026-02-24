@@ -73,6 +73,7 @@ func TestRunPrompts_CustomValues(t *testing.T) {
 	assertEqual(t, "RunCmd", info.RunCmd, "my custom cmd")
 	assertEqual(t, "Goal", info.Goal, "my custom goal")
 	assertEqual(t, "SpecsDir", info.SpecsDir, "my/specs")
+	assert.True(t, info.SpecsDirExact)
 }
 
 func TestRunPrompts_OutputContainsPrompts(t *testing.T) {
@@ -121,6 +122,48 @@ func TestRunPrompts_UnknownLanguageSelectsCustom(t *testing.T) {
 	assertEqual(t, "RunCmd", info.RunCmd, "my run cmd")
 	assertEqual(t, "Goal", info.Goal, "Learning spike / reference")
 	assertEqual(t, "SpecsDir", info.SpecsDir, "specs")
+}
+
+func TestRunPrompts_CustomSpecsDirSetsExactFlag(t *testing.T) {
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+	}
+	// Select "Type something." for all three prompts, then type custom values.
+	input := "3\nmy custom cmd\n3\nmy custom goal\n3\nmy/custom/specs\n"
+	out := &bytes.Buffer{}
+
+	err := RunPrompts(info, &PromptOptions{
+		In:         &byteReader{strings.NewReader(input)},
+		Out:        out,
+		Accessible: true,
+	})
+	require.NoError(t, err)
+
+	assertEqual(t, "SpecsDir", info.SpecsDir, "my/custom/specs")
+	assert.True(t, info.SpecsDirExact, "custom specs dir should set SpecsDirExact")
+}
+
+func TestRunPrompts_PresetSpecsDirNotExact(t *testing.T) {
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+	}
+	input := defaultsInput
+	out := &bytes.Buffer{}
+
+	err := RunPrompts(info, &PromptOptions{
+		In:         &byteReader{strings.NewReader(input)},
+		Out:        out,
+		Accessible: true,
+	})
+	require.NoError(t, err)
+
+	assert.False(t, info.SpecsDirExact, "preset specs dir should not set SpecsDirExact")
 }
 
 func TestValidateSpecsDir(t *testing.T) {

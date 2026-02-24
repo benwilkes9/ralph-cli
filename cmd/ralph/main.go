@@ -162,7 +162,7 @@ func resolveRunParams(cmd *cobra.Command) (*runParams, error) {
 
 	sanitized := git.SanitizeBranch(branch)
 	if specsDir == "" {
-		specsDir = "specs/" + sanitized
+		specsDir = cfg.SpecsDirForBranch(sanitized)
 	}
 	planFile := cfg.PlanPathForBranch(sanitized)
 
@@ -221,7 +221,7 @@ func planCmd(orch Orchestrator) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
-	cmd.Flags().String("specs", "", "specs directory (default: specs/{branch})")
+	cmd.Flags().String("specs", "", "specs directory (overrides specs_dir in config)")
 	return cmd
 }
 
@@ -244,7 +244,7 @@ func applyCmd(orch Orchestrator) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
-	cmd.Flags().String("specs", "", "specs directory (default: specs/{branch})")
+	cmd.Flags().String("specs", "", "specs directory (overrides specs_dir in config)")
 	return cmd
 }
 
@@ -360,7 +360,7 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 	}
 	specsDir := os.Getenv("SPECS_DIR")
 	if specsDir == "" {
-		specsDir = "specs/" + git.SanitizeBranch(branch)
+		specsDir = cfg.SpecsDirForBranch(git.SanitizeBranch(branch))
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)

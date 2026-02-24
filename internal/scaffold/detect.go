@@ -64,7 +64,8 @@ type ProjectInfo struct {
 	LanguageVersion string
 	PackageManager  PackageManager
 
-	SpecsDir            string   // base directory for specs, e.g. "specs"
+	SpecsDir            string   // specs directory, e.g. "specs" or "my/custom/path"
+	SpecsDirExact       bool     // true when user typed a custom path (branch not appended)
 	DepsDir             string   // "node_modules", ".venv", "target", ""
 	ExtraAllowedDomains []string // ecosystem-specific package registry domains
 

@@ -166,7 +166,10 @@ func TestCheck_AutoCommitsSpecsDir(t *testing.T) {
 	require.NoError(t, err)
 
 	log := gitLog(t, clone)
-	assert.Contains(t, log, "chore: add requirements/v2 directory")
+	assert.Contains(t, log, "chore: scaffold ralph")
+
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "requirements/v2/.gitkeep")
 }
 
 func TestCheck_AutoCommitsPlansDir(t *testing.T) {
@@ -188,7 +191,10 @@ func TestCheck_AutoCommitsPlansDir(t *testing.T) {
 	require.NoError(t, err)
 
 	log := gitLog(t, clone)
-	assert.Contains(t, log, "chore: add custom/plans directory")
+	assert.Contains(t, log, "chore: scaffold ralph")
+
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "custom/plans/.gitkeep")
 }
 
 func TestCheck_CustomPlanDir_NoAutoPush(t *testing.T) {
@@ -217,6 +223,28 @@ func TestCheck_CustomPlanDir_NoAutoPush(t *testing.T) {
 	// Verify the plan was NOT auto-pushed — diff should still exist.
 	diff := gitDiff(t, clone, "origin/main", "--", "plans/")
 	assert.NotEmpty(t, diff, "expected unpushed changes to remain — preflight should not auto-push")
+}
+
+func TestCheck_AutoCommitsModifiedGitignore(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
+
+	// Create and commit a .gitignore, then scaffold.
+	require.NoError(t, os.WriteFile(filepath.Join(clone, ".gitignore"), []byte("*.pyc\n"), 0o600))
+	testutil.RunGit(t, clone, "add", ".gitignore")
+	testutil.RunGit(t, clone, "commit", "-m", "add gitignore")
+	testutil.RunGit(t, clone, "push", "origin", "main")
+
+	writeScaffold(t, clone)
+	// Simulate ralph init appending to .gitignore (file is already tracked).
+	require.NoError(t, os.WriteFile(filepath.Join(clone, ".gitignore"), []byte("*.pyc\n.ralph/logs/\n.env\n"), 0o600))
+
+	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
+	require.NoError(t, err)
+
+	// Verify .gitignore was included in the scaffold commit.
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, ".gitignore")
 }
 
 func TestCheck_AllClean(t *testing.T) {

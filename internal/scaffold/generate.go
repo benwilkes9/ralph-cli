@@ -113,7 +113,7 @@ func Generate(repoRoot, branch string, info *ProjectInfo, force bool) (*Generate
 	}
 
 	specsDir := info.SpecsDir
-	if branch != "" {
+	if branch != "" && !info.SpecsDirExact {
 		specsDir = info.SpecsDir + "/" + branch
 	}
 	result.SpecsDir = specsDir

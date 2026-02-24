@@ -63,10 +63,16 @@ func initSimpleRepo(t *testing.T) string {
 // initRepoWithConfig creates initSimpleRepo plus a minimal .ralph/config.yaml.
 func initRepoWithConfig(t *testing.T) string {
 	t.Helper()
+	return initRepoWithConfigYAML(t, "project: test\n")
+}
+
+// initRepoWithConfigYAML creates initSimpleRepo plus a custom .ralph/config.yaml.
+func initRepoWithConfigYAML(t *testing.T, yaml string) string {
+	t.Helper()
 	dir := initSimpleRepo(t)
 	ralph := filepath.Join(dir, ".ralph")
 	require.NoError(t, os.MkdirAll(ralph, 0o750))
-	require.NoError(t, os.WriteFile(filepath.Join(ralph, "config.yaml"), []byte("project: test\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(ralph, "config.yaml"), []byte(yaml), 0o600))
 	return dir
 }
 
@@ -154,6 +160,43 @@ func TestResolveRunParams_ProtectedBranch(t *testing.T) {
 	_, err := resolveRunParams(cmd)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "feature branch")
+}
+
+func TestResolveRunParams_SpecsDirFromConfig(t *testing.T) {
+	dir := initRepoWithConfigYAML(t, "project: test\nspecs_dir: docs/requirements\n")
+	testutil.Chdir(t, dir)
+
+	cmd := planCmd(&fakeOrchestrator{})
+
+	p, err := resolveRunParams(cmd)
+	require.NoError(t, err)
+
+	assert.Equal(t, "docs/requirements/feature-test", p.specsDir)
+}
+
+func TestResolveRunParams_SpecsDirExactFromConfig(t *testing.T) {
+	dir := initRepoWithConfigYAML(t, "project: test\nspecs_dir: my/exact/path\nspecs_dir_exact: true\n")
+	testutil.Chdir(t, dir)
+
+	cmd := planCmd(&fakeOrchestrator{})
+
+	p, err := resolveRunParams(cmd)
+	require.NoError(t, err)
+
+	assert.Equal(t, "my/exact/path", p.specsDir)
+}
+
+func TestResolveRunParams_FlagOverridesConfigSpecsDir(t *testing.T) {
+	dir := initRepoWithConfigYAML(t, "project: test\nspecs_dir: docs/requirements\n")
+	testutil.Chdir(t, dir)
+
+	cmd := planCmd(&fakeOrchestrator{})
+	require.NoError(t, cmd.Flags().Set("specs", "override/path"))
+
+	p, err := resolveRunParams(cmd)
+	require.NoError(t, err)
+
+	assert.Equal(t, "override/path", p.specsDir)
 }
 
 // --- initCmd ---

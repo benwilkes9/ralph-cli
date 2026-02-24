@@ -77,7 +77,7 @@ I think of all of the above as an implementation of the [four foundational agent
 Ralph is branch-aware — plans and specs are isolated per branch so parallel features don't collide:
 
 - **All commands** (`init`, `plan`, `apply`) **must be run on a feature branch** — they'll error on `main` or `master`
-- **Specs directory** is chosen during `ralph init` (default: `specs/`), with the branch appended automatically (e.g. `specs/my-feature/`). Overridable per-run with `--specs`
+- **Specs directory** is chosen during `ralph init`. Preset options (e.g. `specs/`) have the branch appended automatically (e.g. `specs/my-feature/`). Custom paths are used as-is. Overridable per-run with `--specs`
 - **Plans** are stored at `.ralph/plans/IMPLEMENTATION_PLAN_{branch}.md` (e.g. `IMPLEMENTATION_PLAN_my-feature.md`)
 - `ralph plan` **requires at least one `.md` spec** in the specs directory before it will run
 - `ralph apply` **requires an implementation plan** — run `ralph plan` first
@@ -98,7 +98,7 @@ Ralph is branch-aware — plans and specs are isolated per branch so parallel fe
 | Flag | Description |
 |------|-------------|
 | `-n, --max <N>` | Limit iterations (e.g. `ralph plan -n 3`) |
-| `--specs <dir>` | Use a custom specs directory (default: `specs/{branch}`) |
+| `--specs <dir>` | Override the specs directory configured in `.ralph/config.yaml` |
 | `--force` | Overwrite existing scaffold files (useful after upgrading ralph) |
 
 Flags can be combined: `ralph plan -n 3 --specs specs/custom-dir`

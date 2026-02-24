@@ -27,42 +27,34 @@ func Check(branch, specsDir, planFile string) error {
 		return fmt.Errorf("preflight: checking config: %w", err)
 	}
 
-	// 2. Auto-commit scaffold files that are not yet tracked.
-	//    .ralph/ and root-level files (AGENTS.md, .env.example, .gitignore)
-	//    may have been created at different times, so check each individually.
-	var untracked []string
+	// 2. Stage all scaffold-related paths and commit in a single step.
+	//    This covers untracked files, modified files (e.g. .gitignore after
+	//    append), specs dir, and plans dir.
+
+	// .ralph/ directory — only add if not yet tracked.
 	ralphTracked, err := git.IsTracked(".ralph/config.yaml")
 	if err != nil {
 		return fmt.Errorf("preflight: checking git tracking: %w", err)
 	}
 	if !ralphTracked {
-		untracked = append(untracked, ".ralph/")
-	}
-	for _, f := range scaffold.RootFiles() {
-		if _, statErr := os.Stat(filepath.Join(repoRoot, f)); statErr != nil {
-			continue // file doesn't exist on disk
-		}
-		fTracked, trackErr := git.IsTracked(f)
-		if trackErr != nil {
-			return fmt.Errorf("preflight: checking git tracking for %s: %w", f, trackErr)
-		}
-		if !fTracked {
-			untracked = append(untracked, f)
-		}
-	}
-	if len(untracked) > 0 {
-		fmt.Println("Committing scaffold files...")
-		for _, p := range untracked {
-			if err := git.Add(p); err != nil {
-				return fmt.Errorf("preflight: git add %s: %w", p, err)
-			}
-		}
-		if err := git.Commit("chore: scaffold ralph"); err != nil {
-			return fmt.Errorf("preflight: git commit: %w", err)
+		if err := git.Add(".ralph/"); err != nil {
+			return fmt.Errorf("preflight: git add .ralph/: %w", err)
 		}
 	}
 
-	// 2b. Auto-commit specs dir and plans dir if present but untracked.
+	// Root-level files (AGENTS.md, .env.example, .gitignore).
+	// Always add if they exist — handles both untracked and modified.
+	// git add on a clean tracked file is a no-op.
+	for _, f := range scaffold.RootFiles() {
+		if _, statErr := os.Stat(filepath.Join(repoRoot, f)); statErr != nil {
+			continue
+		}
+		if err := git.Add(f); err != nil {
+			return fmt.Errorf("preflight: git add %s: %w", f, err)
+		}
+	}
+
+	// Specs and plans directories — add if untracked.
 	for _, dir := range []string{specsDir, filepath.Dir(planFile)} {
 		dirPath := filepath.Join(repoRoot, dir)
 		if _, statErr := os.Stat(dirPath); os.IsNotExist(statErr) {
@@ -73,13 +65,21 @@ func Check(branch, specsDir, planFile string) error {
 			return fmt.Errorf("preflight: checking git tracking for %s: %w", dir, trackErr)
 		}
 		if !dirTracked {
-			fmt.Printf("Committing %s/ directory...\n", dir)
-			if addErr := git.Add(dir + "/"); addErr != nil {
-				return fmt.Errorf("preflight: git add %s/: %w", dir, addErr)
+			if err := git.Add(dir + "/"); err != nil {
+				return fmt.Errorf("preflight: git add %s/: %w", dir, err)
 			}
-			if commitErr := git.Commit(fmt.Sprintf("chore: add %s directory", dir)); commitErr != nil {
-				return fmt.Errorf("preflight: git commit: %w", commitErr)
-			}
+		}
+	}
+
+	// Commit only if there are actually staged changes.
+	hasChanges, err := git.HasStagedChanges()
+	if err != nil {
+		return fmt.Errorf("preflight: checking staged changes: %w", err)
+	}
+	if hasChanges {
+		fmt.Println("Committing scaffold files...")
+		if err := git.Commit("chore: scaffold ralph"); err != nil {
+			return fmt.Errorf("preflight: %w", err)
 		}
 	}
 

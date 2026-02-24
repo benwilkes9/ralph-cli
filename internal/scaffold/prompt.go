@@ -60,7 +60,7 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 		// Group 6: Custom specs dir (shown only if "Type something." selected)
 		huh.NewGroup(
 			huh.NewInput().
-				Title("Specs directory").
+				Title("Specs directory (used as-is, branch not appended)").
 				Value(&info.SpecsDir),
 		).WithHideFunc(func() bool { return specsChoice != customSentinel }),
 	).WithAccessible(opts.Accessible)
@@ -84,6 +84,8 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 	}
 	if specsChoice != customSentinel {
 		info.SpecsDir = specsChoice
+	} else {
+		info.SpecsDirExact = true
 	}
 
 	if err := validateSpecsDir(info.SpecsDir); err != nil {

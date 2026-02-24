@@ -1,5 +1,9 @@
 project: "{{.ProjectName}}"
 agent: claude
+specs_dir: "{{.SpecsDir}}"
+{{- if .SpecsDirExact}}
+specs_dir_exact: true
+{{- end}}
 
 backpressure:
   test: "{{.TestCmd}}"

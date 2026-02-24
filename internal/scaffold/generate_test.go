@@ -93,6 +93,7 @@ func TestGenerate_ConfigContent(t *testing.T) {
 	s := string(content)
 
 	assert.Contains(t, s, `project: "myapp"`)
+	assert.Contains(t, s, `specs_dir: "specs"`)
 	assert.Contains(t, s, `test: "go test ./..."`)
 	assert.Contains(t, s, `lint: "golangci-lint run ./..."`)
 }
@@ -280,6 +281,73 @@ func TestGenerate_CustomSpecsDirWithBranch(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, "docs", "specs", "feat-x", ".gitkeep"))
 	assert.Contains(t, result.Created, "docs/specs/feat-x/.gitkeep")
 	assert.Equal(t, "docs/specs/feat-x", result.SpecsDir)
+}
+
+func TestGenerate_ConfigIncludesSpecsDirExact(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "my/exact/path",
+		SpecsDirExact:  true,
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	_, err := Generate(dir, "feat", info, false)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "config.yaml"))
+	require.NoError(t, err)
+	s := string(content)
+
+	assert.Contains(t, s, `specs_dir: "my/exact/path"`)
+	assert.Contains(t, s, "specs_dir_exact: true")
+}
+
+func TestGenerate_ConfigOmitsSpecsDirExactWhenFalse(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	_, err := Generate(dir, "feat", info, false)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "config.yaml"))
+	require.NoError(t, err)
+	s := string(content)
+
+	assert.Contains(t, s, `specs_dir: "specs"`)
+	assert.NotContains(t, s, "specs_dir_exact")
+}
+
+func TestGenerate_ExactSpecsDirSkipsBranch(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "my/custom/path",
+		SpecsDirExact:  true,
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result, err := Generate(dir, "my-feature", info, false)
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(dir, "my", "custom", "path", ".gitkeep"))
+	assert.Equal(t, "my/custom/path", result.SpecsDir)
 }
 
 func TestGenerate_ForceOverwritesFiles(t *testing.T) {

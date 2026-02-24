@@ -11,8 +11,10 @@ import (
 
 // Config holds the ralph project configuration loaded from .ralph/config.yaml.
 type Config struct {
-	Project string `yaml:"project"`
-	Agent   string `yaml:"agent"`
+	Project       string `yaml:"project"`
+	Agent         string `yaml:"agent"`
+	SpecsDir      string `yaml:"specs_dir,omitempty"`       // specs directory, e.g. "specs" or "my/custom/path"
+	SpecsDirExact bool   `yaml:"specs_dir_exact,omitempty"` // when true, specs_dir is used as-is (branch not appended)
 
 	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
 	Backpressure      Backpressure `yaml:"backpressure"`
@@ -107,6 +109,14 @@ func (c *Config) validate() error {
 		}
 	}
 
+	if c.SpecsDir != "" {
+		clean := filepath.Clean(c.SpecsDir)
+		if filepath.IsAbs(clean) || clean == "." || clean == ".." ||
+			strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("specs_dir must be a relative path within the project, got %q", c.SpecsDir)
+		}
+	}
+
 	return nil
 }
 
@@ -132,6 +142,20 @@ func (c *Config) applyDefaults() {
 	if c.Phases.Build.MaxIterations == 0 {
 		c.Phases.Build.MaxIterations = 20
 	}
+}
+
+// SpecsDirForBranch returns the resolved specs directory path.
+// When SpecsDirExact is true, SpecsDir is returned as-is.
+// Otherwise the sanitized branch is appended: e.g. "specs" → "specs/my-feature".
+func (c *Config) SpecsDirForBranch(sanitizedBranch string) string {
+	base := c.SpecsDir
+	if base == "" {
+		base = "specs"
+	}
+	if c.SpecsDirExact {
+		return base
+	}
+	return base + "/" + sanitizedBranch
 }
 
 // PlanPathForBranch returns the branch-specific plan file path.
