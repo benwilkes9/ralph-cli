@@ -77,6 +77,7 @@ func TestGenerate_ConfigContent(t *testing.T) {
 		ProjectName:     "myapp",
 		Language:        LangGo,
 		LanguageVersion: "1.25.7",
+		GoVersion:       "1.25.7",
 		PackageManager:  PmGo,
 		SpecsDir:        "specs",
 		InstallCmd:      "go mod download",
@@ -201,6 +202,7 @@ func TestGenerate_DockerfileContent(t *testing.T) {
 		ProjectName:     "test-project",
 		Language:        LangPython,
 		LanguageVersion: "3.12",
+		GoVersion:       DefaultGoVersion,
 		PackageManager:  PmUV,
 		SpecsDir:        "specs",
 		InstallCmd:      "uv sync --all-extras",
@@ -217,6 +219,7 @@ func TestGenerate_DockerfileContent(t *testing.T) {
 
 	assert.Contains(t, s, "FROM node:22-bookworm")
 	assert.Contains(t, s, "uv python install 3.12")
+	assert.Contains(t, s, "golang:"+DefaultGoVersion+"-bookworm")
 	assert.Contains(t, s, "ralph")
 }
 
@@ -348,6 +351,25 @@ func TestGenerate_ExactSpecsDirSkipsBranch(t *testing.T) {
 
 	assert.FileExists(t, filepath.Join(dir, "my", "custom", "path", ".gitkeep"))
 	assert.Equal(t, "my/custom/path", result.SpecsDir)
+}
+
+func TestGenerate_SlashedBranchSanitized(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result, err := Generate(dir, "feature/auth-flow", info, false)
+	require.NoError(t, err)
+
+	assert.Equal(t, "specs/feature-auth-flow", result.SpecsDir)
+	assert.FileExists(t, filepath.Join(dir, "specs", "feature-auth-flow", ".gitkeep"))
 }
 
 func TestGenerate_ForceOverwritesFiles(t *testing.T) {

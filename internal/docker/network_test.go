@@ -34,6 +34,14 @@ func TestAllowedDomains(t *testing.T) {
 				"pypi.org", "files.pythonhosted.org",
 			),
 		},
+		{
+			name:   "duplicate extras are deduplicated",
+			extras: []string{"github.com", "pypi.org"},
+			want: append(
+				append([]string{}, DefaultAllowedDomains...),
+				"pypi.org",
+			),
+		},
 	}
 
 	for _, tt := range tests {

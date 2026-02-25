@@ -55,6 +55,7 @@ func TestDetect_Go(t *testing.T) {
 	assert.Equal(t, "go", string(info.Language))
 	assert.Equal(t, "go", string(info.PackageManager))
 	assert.Equal(t, "1.25.7", info.LanguageVersion)
+	assert.Equal(t, "1.25.7", info.GoVersion)
 	assert.Equal(t, "go mod download", info.InstallCmd)
 	assert.Equal(t, "go test ./...", info.TestCmd)
 	assert.True(t, info.HasMakefile)
@@ -190,6 +191,7 @@ func TestDetect_Unknown(t *testing.T) {
 
 	assert.Equal(t, "unknown", string(info.Language))
 	assert.Equal(t, "unknown", string(info.PackageManager))
+	assert.Equal(t, DefaultGoVersion, info.GoVersion)
 	assert.Equal(t, filepath.Base(dir), info.ProjectName)
 }
 

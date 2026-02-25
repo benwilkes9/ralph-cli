@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 //go:embed all:templates
@@ -60,7 +62,7 @@ type GenerateResult struct {
 	Created     []string
 	Overwritten []string
 	Skipped     []string
-	SpecsDir    string // resolved specs directory including branch (e.g. "specs/my-feature")
+	SpecsDir    string // resolved specs directory including sanitized branch (e.g. "specs/my-feature")
 }
 
 // Generate renders all templates into the repo, skipping existing files.
@@ -114,7 +116,7 @@ func Generate(repoRoot, branch string, info *ProjectInfo, force bool) (*Generate
 
 	specsDir := info.SpecsDir
 	if branch != "" && !info.SpecsDirExact {
-		specsDir = info.SpecsDir + "/" + branch
+		specsDir = info.SpecsDir + "/" + git.SanitizeBranch(branch)
 	}
 	result.SpecsDir = specsDir
 

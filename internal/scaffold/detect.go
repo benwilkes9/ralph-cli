@@ -41,6 +41,10 @@ const (
 	PmUnknown PackageManager = "unknown"
 )
 
+// DefaultGoVersion is the Go version used in the Dockerfile when the project
+// is not a Go project (i.e. Go is only needed to install the ralph CLI).
+const DefaultGoVersion = "1.25"
+
 // Dependency directory names used as DepsDir values.
 const (
 	depsNodeModules = "node_modules"
@@ -62,6 +66,7 @@ type ProjectInfo struct {
 	ProjectName     string
 	Language        Language
 	LanguageVersion string
+	GoVersion       string // Go version for Dockerfile (detected for Go projects, DefaultGoVersion otherwise)
 	PackageManager  PackageManager
 
 	SpecsDir            string   // specs directory, e.g. "specs" or "my/custom/path"
@@ -118,6 +123,11 @@ func Detect(repoRoot string) *ProjectInfo {
 	}
 
 	info.LanguageVersion = detectLanguageVersion(repoRoot, info.Language)
+	if info.Language == LangGo && info.LanguageVersion != "" {
+		info.GoVersion = info.LanguageVersion
+	} else {
+		info.GoVersion = DefaultGoVersion
+	}
 	applyEcosystemDefaults(info)
 	info.SourceDirs = detectDirs(repoRoot, []string{"src", "lib", "app", "cmd", "internal"})
 	info.TestDirs = detectDirs(repoRoot, []string{"tests", "test", "__tests__"})

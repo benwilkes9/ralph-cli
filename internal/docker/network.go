@@ -11,10 +11,16 @@ var DefaultAllowedDomains = []string{
 	"registry.npmjs.org",
 }
 
-// AllowedDomains merges the default allowed domains with user-configured extras.
+// AllowedDomains merges the default allowed domains with user-configured extras,
+// deduplicating any overlap.
 func AllowedDomains(extras []string) []string {
+	seen := make(map[string]bool, len(DefaultAllowedDomains)+len(extras))
 	all := make([]string, 0, len(DefaultAllowedDomains)+len(extras))
-	all = append(all, DefaultAllowedDomains...)
-	all = append(all, extras...)
+	for _, d := range append(DefaultAllowedDomains, extras...) {
+		if !seen[d] {
+			seen[d] = true
+			all = append(all, d)
+		}
+	}
 	return all
 }

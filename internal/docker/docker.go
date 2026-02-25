@@ -10,6 +10,8 @@ import (
 	"github.com/benwilkes9/ralph-cli/internal/preflight"
 )
 
+// requiredEnvVars lists env vars required beyond auth credentials
+// (auth is validated separately by ResolveAuth).
 var requiredEnvVars = []string{"GITHUB_PAT"}
 
 // allowedEnvVars is the set of env var names that may be loaded from .env.
