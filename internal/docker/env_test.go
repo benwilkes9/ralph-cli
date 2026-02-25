@@ -103,12 +103,12 @@ func TestResolveAuth(t *testing.T) {
 		},
 		{
 			name: "OAuth token only",
-			env:  map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-value"},
+			env:  map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-value"}, //nolint:gosec // test fixture
 			want: AuthOAuth,
 		},
 		{
 			name: "both present — API key wins",
-			env: map[string]string{
+			env: map[string]string{ //nolint:gosec // test fixture
 				"ANTHROPIC_API_KEY":       "test-api-key-value",
 				"CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-value",
 			},
