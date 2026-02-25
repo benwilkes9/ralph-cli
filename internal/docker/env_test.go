@@ -98,19 +98,19 @@ func TestResolveAuth(t *testing.T) {
 	}{
 		{
 			name: "API key only",
-			env:  map[string]string{"ANTHROPIC_API_KEY": "sk-ant-api03-xxx"},
+			env:  map[string]string{"ANTHROPIC_API_KEY": "test-api-key-value"},
 			want: AuthAPIKey,
 		},
 		{
 			name: "OAuth token only",
-			env:  map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-xxx"},
+			env:  map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-value"},
 			want: AuthOAuth,
 		},
 		{
 			name: "both present — API key wins",
 			env: map[string]string{
-				"ANTHROPIC_API_KEY":       "sk-ant-api03-xxx",
-				"CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-xxx",
+				"ANTHROPIC_API_KEY":       "test-api-key-value",
+				"CLAUDE_CODE_OAUTH_TOKEN": "test-oauth-value",
 			},
 			want: AuthAPIKey,
 		},
