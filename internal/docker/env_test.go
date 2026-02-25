@@ -75,7 +75,7 @@ func TestValidateEnv(t *testing.T) {
 
 func TestAllowedEnvVars(t *testing.T) {
 	t.Run("allowed keys pass", func(t *testing.T) {
-		allowed := []string{"ANTHROPIC_API_KEY", "GITHUB_PAT"}
+		allowed := []string{"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "GITHUB_PAT"}
 		for _, k := range allowed {
 			assert.True(t, allowedEnvVars[k], "expected %q to be allowed", k)
 		}
@@ -87,6 +87,56 @@ func TestAllowedEnvVars(t *testing.T) {
 			assert.False(t, allowedEnvVars[k], "expected %q to be disallowed", k)
 		}
 	})
+}
+
+func TestResolveAuth(t *testing.T) {
+	tests := []struct {
+		name    string
+		env     map[string]string
+		want    AuthMethod
+		wantErr string
+	}{
+		{
+			name: "API key only",
+			env:  map[string]string{"ANTHROPIC_API_KEY": "sk-ant-api03-xxx"},
+			want: AuthAPIKey,
+		},
+		{
+			name: "OAuth token only",
+			env:  map[string]string{"CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-xxx"},
+			want: AuthOAuth,
+		},
+		{
+			name: "both present — API key wins",
+			env: map[string]string{
+				"ANTHROPIC_API_KEY":       "sk-ant-api03-xxx",
+				"CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-xxx",
+			},
+			want: AuthAPIKey,
+		},
+		{
+			name:    "neither present",
+			env:     map[string]string{},
+			wantErr: "missing auth: set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clear env so os.Getenv fallback doesn't interfere.
+			t.Setenv("ANTHROPIC_API_KEY", "")
+			t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+
+			got, err := ResolveAuth(tt.env)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func writeTemp(t *testing.T, content string) string {

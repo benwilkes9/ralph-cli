@@ -3,8 +3,10 @@ set -euo pipefail
 
 # ─── Validate required env vars ─────────────────────────────────
 missing=()
-[ -z "${ANTHROPIC_API_KEY:-}" ] && missing+=("ANTHROPIC_API_KEY")
-[ -z "${GITHUB_PAT:-}" ]       && missing+=("GITHUB_PAT")
+if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+    missing+=("ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN")
+fi
+[ -z "${GITHUB_PAT:-}" ] && missing+=("GITHUB_PAT")
 [ -z "${BRANCH:-}" ]           && missing+=("BRANCH")
 
 if [ ${#missing[@]} -gt 0 ]; then

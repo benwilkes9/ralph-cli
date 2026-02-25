@@ -10,14 +10,41 @@ import (
 	"github.com/benwilkes9/ralph-cli/internal/preflight"
 )
 
-var requiredEnvVars = []string{"ANTHROPIC_API_KEY", "GITHUB_PAT"}
+var requiredEnvVars = []string{"GITHUB_PAT"}
 
 // allowedEnvVars is the set of env var names that may be loaded from .env.
 // This prevents a compromised .env file from injecting vars like PATH or
 // LD_PRELOAD into the process environment.
 var allowedEnvVars = map[string]bool{
-	"ANTHROPIC_API_KEY": true,
-	"GITHUB_PAT":        true,
+	"ANTHROPIC_API_KEY":       true,
+	"CLAUDE_CODE_OAUTH_TOKEN": true,
+	"GITHUB_PAT":              true,
+}
+
+// AuthMethod indicates how the container authenticates with Claude.
+type AuthMethod int
+
+const (
+	// AuthAPIKey uses ANTHROPIC_API_KEY (usage-based billing).
+	AuthAPIKey AuthMethod = iota
+	// AuthOAuth uses CLAUDE_CODE_OAUTH_TOKEN (Claude Max subscription).
+	AuthOAuth
+)
+
+// ResolveAuth determines the authentication method from the environment.
+// API key takes precedence when both are set.
+func ResolveAuth(env map[string]string) (AuthMethod, error) {
+	hasAPIKey := env["ANTHROPIC_API_KEY"] != "" || os.Getenv("ANTHROPIC_API_KEY") != ""
+	hasOAuth := env["CLAUDE_CODE_OAUTH_TOKEN"] != "" || os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != ""
+
+	switch {
+	case hasAPIKey:
+		return AuthAPIKey, nil
+	case hasOAuth:
+		return AuthOAuth, nil
+	default:
+		return 0, fmt.Errorf("missing auth: set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN")
+	}
 }
 
 // BuildAndRun orchestrates the full Docker workflow: detect repo, load env,
@@ -35,11 +62,16 @@ func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir stri
 
 	for k, v := range env {
 		if !allowedEnvVars[k] {
-			return fmt.Errorf("disallowed env var in .env: %s (allowed: ANTHROPIC_API_KEY, GITHUB_PAT)", k)
+			return fmt.Errorf("disallowed env var in .env: %s (allowed: ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, GITHUB_PAT)", k)
 		}
 		if err := os.Setenv(k, v); err != nil {
 			return fmt.Errorf("setting env %s: %w", k, err)
 		}
+	}
+
+	auth, err := ResolveAuth(env)
+	if err != nil {
+		return err
 	}
 
 	if err := ValidateEnv(env, requiredEnvVars); err != nil {
@@ -85,6 +117,7 @@ func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir stri
 		AllowedDomains: allowedDomains,
 		DepsDir:        cfg.Docker.DepsDir,
 		ProjectName:    cfg.Project,
+		Auth:           auth,
 	}
 
 	return Run(runOpts)

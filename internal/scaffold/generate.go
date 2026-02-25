@@ -227,7 +227,7 @@ func PrintSummary(w io.Writer, result *GenerateResult) {
 	}
 	printLine(w, "")
 	printLine(w, "Next steps:")
-	printLine(w, "  1. Edit .env with your API keys — see .env.example for reference")
+	printLine(w, "  1. Edit .env with your credentials — see .env.example for reference")
 	printLine(w, "  2. Review .ralph/config.yaml and .ralph/prompts/")
 	printLine(w, fmt.Sprintf("  3. Add your specs to %s/", result.SpecsDir))
 	printLine(w, "  4. Run: ralph plan (scaffold files will be auto-committed)")

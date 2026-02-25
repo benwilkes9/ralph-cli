@@ -6,6 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestDefaultAllowedDomains_ContainsClaudeAI(t *testing.T) {
+	assert.Contains(t, DefaultAllowedDomains, "claude.ai")
+}
+
 func TestAllowedDomains(t *testing.T) {
 	tests := []struct {
 		name   string

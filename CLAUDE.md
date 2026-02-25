@@ -82,7 +82,7 @@ templates/              — Embedded scaffold templates for ralph init (//go:emb
 - **DepsDir validation** — `docker.deps_dir` is validated against path traversal (`../`, absolute paths, `.`) to prevent volume mount escapes
 - **stream-json format** — Claude's `--output-format=stream-json` produces JSONL; we parse line-by-line with bufio.Scanner + json.Unmarshal
 - **Embedded templates** — scaffold files use Go's `text/template` + `//go:embed`
-- **Env var allowlist** — `.env` loading only permits `ANTHROPIC_API_KEY` and `GITHUB_PAT`; update `allowedEnvVars` in `internal/docker/docker.go` when adding new vars
+- **Env var allowlist** — `.env` loading only permits `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, and `GITHUB_PAT`; update `allowedEnvVars` in `internal/docker/docker.go` when adding new vars
 - **Version sanitization** — language versions detected from repo files are validated against `safeVersion` regex before template interpolation to prevent shell injection
 
 ## Pre-commit Workflow

@@ -18,9 +18,10 @@ type RunOptions struct {
 	ProjectDir     string // host project root for bind mount
 	PlanFile       string
 	SpecsDir       string
-	AllowedDomains []string // merged default + extra
-	DepsDir        string   // relative path for dep volume overlay (e.g. "node_modules"), empty = none
-	ProjectName    string   // for volume naming
+	AllowedDomains []string   // merged default + extra
+	DepsDir        string     // relative path for dep volume overlay (e.g. "node_modules"), empty = none
+	ProjectName    string     // for volume naming
+	Auth           AuthMethod // which credential to pass into the container
 }
 
 // Run executes docker run with the given options, attaching stdin/stdout/stderr.
@@ -29,11 +30,16 @@ func Run(opts *RunOptions) error {
 }
 
 func runWithRunner(runner CommandRunner, opts *RunOptions) error {
+	authEnv := "ANTHROPIC_API_KEY"
+	if opts.Auth == AuthOAuth {
+		authEnv = "CLAUDE_CODE_OAUTH_TOKEN"
+	}
+
 	args := []string{
 		"run", "--rm", "-it",
 		"--security-opt", "no-new-privileges",
 		"--cap-add", "NET_ADMIN",
-		"-e", "ANTHROPIC_API_KEY",
+		"-e", authEnv,
 		"-e", "GITHUB_PAT",
 		"-e", "BRANCH=" + opts.Branch,
 		"-e", "PLAN_FILE=" + opts.PlanFile,

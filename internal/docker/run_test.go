@@ -20,6 +20,7 @@ func baseRunOpts() *RunOptions {
 		SpecsDir:       "specs",
 		AllowedDomains: DefaultAllowedDomains,
 		ProjectName:    "myproject",
+		Auth:           AuthAPIKey,
 	}
 }
 
@@ -57,12 +58,23 @@ func TestRunWithRunner_EnvVars(t *testing.T) {
 	assert.Contains(t, call, "SPECS_DIR=specs")
 }
 
+func TestRunWithRunner_OAuthEnvVar(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.Auth = AuthOAuth
+	require.NoError(t, runWithRunner(r, opts))
+
+	call := r.calls[0]
+	assert.Contains(t, call, "CLAUDE_CODE_OAUTH_TOKEN")
+	assert.NotContains(t, call, "ANTHROPIC_API_KEY")
+}
+
 func TestRunWithRunner_AllowedDomainsEnvVar(t *testing.T) {
 	r := &fakeRunner{}
 	require.NoError(t, runWithRunner(r, baseRunOpts()))
 
 	call := r.calls[0]
-	assert.Contains(t, call, "ALLOWED_DOMAINS=api.anthropic.com,github.com,api.github.com,registry.npmjs.org")
+	assert.Contains(t, call, "ALLOWED_DOMAINS=api.anthropic.com,claude.ai,github.com,api.github.com,registry.npmjs.org")
 }
 
 func TestRunWithRunner_NoRepoEnvVar(t *testing.T) {

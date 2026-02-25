@@ -5,6 +5,7 @@ package docker
 // git push/pull, and npm updates.
 var DefaultAllowedDomains = []string{
 	"api.anthropic.com",
+	"claude.ai",
 	"github.com",
 	"api.github.com",
 	"registry.npmjs.org",

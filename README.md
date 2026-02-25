@@ -29,9 +29,9 @@ git checkout -b my-feature
 # 2. Scaffold .ralph/ — interactive prompts will ask about your project
 ralph init
 
-# 3. Add your API keys
+# 3. Add your credentials
 cp .env.example .env
-# Set ANTHROPIC_API_KEY and GITHUB_PAT in .env
+# Set ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN) and GITHUB_PAT in .env
 
 # 4. Add at least one .md spec to your specs directory
 #    (ralph init creates this for you based on your branch)
@@ -48,6 +48,31 @@ ralph apply
 # 7. Check progress
 ralph status
 ```
+
+## Authentication
+
+Ralph supports two authentication methods for Claude Code:
+
+| Method | Env Var | Billing |
+|--------|---------|---------|
+| API Key | `ANTHROPIC_API_KEY` | Usage-based (API billing) |
+| OAuth Token | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Max subscription |
+
+Set **one** in your `.env` file. If both are set, the API key takes precedence.
+
+### Using an API Key (default)
+
+Set `ANTHROPIC_API_KEY` in `.env`. This uses standard Anthropic API billing.
+
+### Using Claude Max (OAuth)
+
+If you have a Claude Max subscription, you can use your subscription instead of API billing:
+
+1. Run `claude setup-token` to obtain an OAuth token (`sk-ant-oat01-*` format)
+2. Set `CLAUDE_CODE_OAUTH_TOKEN` in `.env`
+3. Leave `ANTHROPIC_API_KEY` blank or remove it
+
+> **Upgrading existing repos:** Run `ralph init --force` to update scaffold files with OAuth support.
 
 ## IMPORTANT Guidelines & Considerations
 
@@ -111,7 +136,7 @@ Ralph runs Claude Code inside a Docker container with a bind-mounted workspace. 
 
 Outbound network access is restricted to an allowlist of domains via iptables rules configured at container startup. All other outbound traffic is dropped.
 
-**Default allowlist** (always included): `api.anthropic.com`, `github.com`, `api.github.com`, `registry.npmjs.org`
+**Default allowlist** (always included): `api.anthropic.com`, `claude.ai`, `github.com`, `api.github.com`, `registry.npmjs.org`
 
 `ralph init` automatically adds the package registry domains for your detected ecosystem:
 
