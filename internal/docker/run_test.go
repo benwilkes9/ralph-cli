@@ -2,6 +2,7 @@ package docker
 
 import (
 	"errors"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,14 +11,16 @@ import (
 
 func baseRunOpts() *RunOptions {
 	return &RunOptions{
-		ImageTag: "ralph-loop",
-		Mode:     "build",
-		MaxIter:  5,
-		Branch:   "main",
-		Repo:     "owner/repo",
-		LogsDir:  "/tmp/logs",
-		PlanFile: ".ralph/plans/PLAN.md",
-		SpecsDir: "specs",
+		ImageTag:       "ralph-loop",
+		Mode:           "build",
+		MaxIter:        5,
+		Branch:         "main",
+		ProjectDir:     "/home/user/project",
+		PlanFile:       ".ralph/plans/PLAN.md",
+		SpecsDir:       "specs",
+		AllowedDomains: DefaultAllowedDomains,
+		ProjectName:    "myproject",
+		Auth:           AuthAPIKey,
 	}
 }
 
@@ -34,6 +37,15 @@ func TestRunWithRunner_SecurityOptions(t *testing.T) {
 	assert.Contains(t, call, "no-new-privileges")
 }
 
+func TestRunWithRunner_CapAddNetAdmin(t *testing.T) {
+	r := &fakeRunner{}
+	require.NoError(t, runWithRunner(r, baseRunOpts()))
+
+	call := r.calls[0]
+	assert.Contains(t, call, "--cap-add")
+	assert.Contains(t, call, "NET_ADMIN")
+}
+
 func TestRunWithRunner_EnvVars(t *testing.T) {
 	r := &fakeRunner{}
 	require.NoError(t, runWithRunner(r, baseRunOpts()))
@@ -41,17 +53,83 @@ func TestRunWithRunner_EnvVars(t *testing.T) {
 	call := r.calls[0]
 	assert.Contains(t, call, "ANTHROPIC_API_KEY")
 	assert.Contains(t, call, "GITHUB_PAT")
-	assert.Contains(t, call, "REPO=owner/repo")
 	assert.Contains(t, call, "BRANCH=main")
 	assert.Contains(t, call, "PLAN_FILE=.ralph/plans/PLAN.md")
 	assert.Contains(t, call, "SPECS_DIR=specs")
 }
 
-func TestRunWithRunner_VolumeMount(t *testing.T) {
+func TestRunWithRunner_OAuthEnvVar(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.Auth = AuthOAuth
+	require.NoError(t, runWithRunner(r, opts))
+
+	call := r.calls[0]
+	assert.Contains(t, call, "CLAUDE_CODE_OAUTH_TOKEN")
+	assert.NotContains(t, call, "ANTHROPIC_API_KEY")
+}
+
+func TestRunWithRunner_AllowedDomainsEnvVar(t *testing.T) {
 	r := &fakeRunner{}
 	require.NoError(t, runWithRunner(r, baseRunOpts()))
 
-	assert.Contains(t, r.calls[0], "/tmp/logs:/app/logs")
+	call := r.calls[0]
+	assert.Contains(t, call, "ALLOWED_DOMAINS=api.anthropic.com,claude.ai,github.com,api.github.com,registry.npmjs.org")
+}
+
+func TestRunWithRunner_NoRepoEnvVar(t *testing.T) {
+	r := &fakeRunner{}
+	require.NoError(t, runWithRunner(r, baseRunOpts()))
+
+	call := r.calls[0]
+	for _, arg := range call {
+		assert.NotContains(t, arg, "REPO=")
+	}
+}
+
+func TestRunWithRunner_BindMount(t *testing.T) {
+	r := &fakeRunner{}
+	require.NoError(t, runWithRunner(r, baseRunOpts()))
+
+	call := r.calls[0]
+	if runtime.GOOS == osDarwin {
+		assert.Contains(t, call, "/home/user/project:/workspace/repo:delegated")
+	} else {
+		assert.Contains(t, call, "/home/user/project:/workspace/repo")
+	}
+}
+
+func TestRunWithRunner_NoLogsVolume(t *testing.T) {
+	r := &fakeRunner{}
+	require.NoError(t, runWithRunner(r, baseRunOpts()))
+
+	call := r.calls[0]
+	for _, arg := range call {
+		assert.NotContains(t, arg, "/app/logs")
+	}
+}
+
+func TestRunWithRunner_DepsVolume_Present(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.DepsDir = "node_modules"
+	require.NoError(t, runWithRunner(r, opts))
+
+	assert.Contains(t, r.calls[0], "ralph-deps-myproject:/workspace/repo/node_modules")
+	assert.Contains(t, r.calls[0], "DEPS_DIR=node_modules")
+}
+
+func TestRunWithRunner_DepsVolume_Absent(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.DepsDir = ""
+	require.NoError(t, runWithRunner(r, opts))
+
+	call := r.calls[0]
+	for _, arg := range call {
+		assert.NotContains(t, arg, "ralph-deps-")
+		assert.NotContains(t, arg, "DEPS_DIR=")
+	}
 }
 
 func TestRunWithRunner_PositionalArgs(t *testing.T) {

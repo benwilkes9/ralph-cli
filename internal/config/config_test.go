@@ -90,6 +90,84 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestLoad_NetworkExtraAllowedDomains(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+network:
+  extra_allowed_domains:
+    - pypi.org
+    - files.pythonhosted.org
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"pypi.org", "files.pythonhosted.org"}, cfg.Network.ExtraAllowedDomains)
+}
+
+func TestLoad_DockerDepsDir(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+docker:
+  deps_dir: node_modules
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "node_modules", cfg.Docker.DepsDir)
+}
+
+func TestLoad_DepsDirTraversal(t *testing.T) {
+	tests := []struct {
+		depsDir string
+		wantErr bool
+	}{
+		{"node_modules", false},
+		{".venv", false},
+		{"target", false},
+		{"", false},
+		{"../../etc", true},
+		{"/etc", true},
+		{"../outside", true},
+		{".", true},
+		{"foo/../../bar", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.depsDir, func(t *testing.T) {
+			dir := t.TempDir()
+			yaml := "project: test\n"
+			if tt.depsDir != "" {
+				yaml += "docker:\n  deps_dir: " + tt.depsDir + "\n"
+			}
+			writeConfig(t, dir, yaml)
+
+			_, err := Load(dir)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "docker.deps_dir must be a relative path")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestLoad_BackwardCompat_NoNetworkOrDocker(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+phases:
+  plan:
+    max_iterations: 3
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Network.ExtraAllowedDomains)
+	assert.Empty(t, cfg.Docker.DepsDir)
+}
+
 func TestPlanPathForBranch_DefaultDir(t *testing.T) {
 	cfg := &Config{}
 	cfg.applyDefaults()
@@ -118,6 +196,83 @@ func TestPlanPathForBranch_CustomDir(t *testing.T) {
 
 	got := cfg.PlanPathForBranch("fix-bug-123")
 	assert.Equal(t, "plans/IMPLEMENTATION_PLAN_fix-bug-123.md", got)
+}
+
+func TestSpecsDirForBranch_Default(t *testing.T) {
+	cfg := &Config{}
+	assert.Equal(t, "specs/my-feature", cfg.SpecsDirForBranch("my-feature"))
+}
+
+func TestSpecsDirForBranch_Custom(t *testing.T) {
+	cfg := &Config{SpecsDir: "docs/requirements"}
+	assert.Equal(t, "docs/requirements/my-feature", cfg.SpecsDirForBranch("my-feature"))
+}
+
+func TestSpecsDirForBranch_Exact(t *testing.T) {
+	cfg := &Config{SpecsDir: "my/exact/path", SpecsDirExact: true}
+	assert.Equal(t, "my/exact/path", cfg.SpecsDirForBranch("my-feature"))
+}
+
+func TestLoad_SpecsDir(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+specs_dir: my/custom/dir
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "my/custom/dir", cfg.SpecsDir)
+	assert.False(t, cfg.SpecsDirExact)
+}
+
+func TestLoad_SpecsDirExact(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+specs_dir: my/exact/path
+specs_dir_exact: true
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "my/exact/path", cfg.SpecsDir)
+	assert.True(t, cfg.SpecsDirExact)
+}
+
+func TestLoad_SpecsDirTraversal(t *testing.T) {
+	tests := []struct {
+		specsDir string
+		wantErr  bool
+	}{
+		{"specs", false},
+		{"docs/requirements", false},
+		{"my/custom/path", false},
+		{"", false},
+		{"../../etc", true},
+		{"/etc", true},
+		{"../outside", true},
+		{".", true},
+		{"foo/../../bar", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.specsDir, func(t *testing.T) {
+			dir := t.TempDir()
+			yaml := "project: test\n"
+			if tt.specsDir != "" {
+				yaml += "specs_dir: " + tt.specsDir + "\n"
+			}
+			writeConfig(t, dir, yaml)
+
+			_, err := Load(dir)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "specs_dir must be a relative path")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func writeConfig(t *testing.T, dir, content string) {

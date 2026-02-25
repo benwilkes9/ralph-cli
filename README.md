@@ -2,9 +2,9 @@
 
 A Go CLI that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) in a loop, AKA [Ralph Wiggum loops](https://ghuntley.com/ralph).
 
-## Why did I make this CLI?
+## Motivation
 
-I made this for myself! The [Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook) is great, but implementing it per repo or project is clunky and time-consuming. This CLI is simply an opinionated convenience implementation of the Ralph Playbook. I use this instead of the [Anthropic plugin](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum) because that runs inside Claude, so the context window is an issue (for now!). This loop runs outside of Claude. 
+The [Ralph Playbook](https://github.com/ClaytonFarr/ralph-playbook) is great, but implementing it per repo or project is clunky and time-consuming. This CLI is an opinionated convenience implementation of the Ralph Playbook. It runs outside of Claude in a [sandboxed container](#container-isolation), so there are no context window constraints — unlike the [Anthropic plugin](https://github.com/anthropics/claude-code/tree/main/plugins/ralph-wiggum) which runs inside Claude.
 
 ## Installation
 
@@ -23,21 +23,23 @@ go install github.com/benwilkes9/ralph-cli/cmd/ralph@latest
 ## Quick Start
 
 ```bash
-# 1. Scaffold .ralph/ in your repo
-ralph init
-
-# 2. Add your API keys
-cp .env.example .env
-# Set ANTHROPIC_API_KEY and GITHUB_PAT in .env
-
-# 3. Create a feature branch (plan/apply won't run on main or master)
+# 1. Create a feature branch (init/plan/apply won't run on main or master)
 git checkout -b my-feature
 
-# 4. Ensure your specs are in your feature folder
+# 2. Scaffold .ralph/ — interactive prompts will ask about your project
+ralph init
+
+# 3. Add your credentials
+cp .env.example .env
+# Set ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN) and GITHUB_PAT in .env
+
+# 4. Add at least one .md spec to your specs directory
+#    (ralph init creates this for you based on your branch)
 specs/my-feature/my-spec-1.md
 specs/my-feature/my-spec-2.md
 
 # 5. Run planning loop (generates .ralph/plans/IMPLEMENTATION_PLAN_my-feature.md)
+#    Scaffold files are auto-committed on first run
 ralph plan
 
 # 6. Run build loop (reads from the implementation plan, implements tasks one at a time)
@@ -47,45 +49,38 @@ ralph apply
 ralph status
 ```
 
-## IMPORTANT Guidelines & Considerations
+## Authentication
 
-### Specs
-The first fundamental idea is that you can implement a full feature in one shot in a single code repo (a monolith, a monorepo, a microservice, whatever — but a single repo). You need well-written, clear, unambiguous specs. Think context engineering, spec-driven development — the results you get will depend on the context you give it.
+Ralph CLI supports two authentication methods for Claude Code:
 
-### Prompts
-`ralph init` generates two prompt files: `.ralph/prompts/plan.md` and `.ralph/prompts/build.md`. These are the instructions that get fed to Claude on every iteration of the plan and build loops respectively. They're yours to customise — tweak them to suit your project, your conventions, your workflow. The defaults are just a solid starting point. 
+| Method | Env Var | Billing |
+|--------|---------|---------|
+| API Key | `ANTHROPIC_API_KEY` | Usage-based (API billing) |
+| OAuth Token | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Max subscription |
 
-### Guardrails / Backpressure
-The other fundamental idea is "backpressure" or "guardrails" — you need to give your build agents clear parameters and guidance. Automated determinsitic, testing, linting, security checking, etc. You need to do this for precommit hooks (as well as CI) so that the agent will review and fix before commiting. 
+Set **one** in your `.env` file. If both are set, the API key takes precedence.
 
-There is also the `AGENTS.md`; this is also prepopulated depending on your tech stack, but again you need to review it and tailor it to your conventions, including the validation steps you expect the agent to run, which obviously needs to align with your precommit hooks. 
+### Using an API Key (default)
 
-This is where you need to put your engineering hat on. If you're going to expect Claude to implement good quality code consistently; you need to tell it what good looks like and put the guardrails in place.
+Set `ANTHROPIC_API_KEY` in `.env`. This uses standard Anthropic API billing.
 
-### Token Use
-If you're coming from the "human in the loop" approach to agentic engineering — one task at a time — this will use a lot more tokens. And if you don't give it well-written, clear, unambiguous specs and clear guardrails then you will **waste a lot of tokens**! YOU HAVE BEEN WARNED!
+### Using Claude Max (OAuth)
 
-### Monitoring
-The CLI gives you well-formatted output of what's going on — thinking, tool use, token use, results. It pays to monitor it closely, at least for the first few iterations.
+If you have a Claude Max subscription, you can use your subscription instead of API billing:
 
-I think of all of the above as an implementation of the [four foundational agentic patterns](https://www.nibzard.com/agentic-handbook#foundational-patterns-you-can-use-immediately): plan then execute; inversion of control; reflection loop; action trace monitoring & interruption. Running in a loop is not a silver bullet - it needs engineering.
+1. Run `claude setup-token` to obtain an OAuth token (`sk-ant-oat01-*` format)
+2. Set `CLAUDE_CODE_OAUTH_TOKEN` in `.env`
+3. Leave `ANTHROPIC_API_KEY` blank or remove it
 
-### Branch-Aware Conventions
-
-Ralph is branch-aware — plans and specs are isolated per branch so parallel features don't collide:
-
-- **Plans** are stored at `.ralph/plans/IMPLEMENTATION_PLAN_{branch}.md` (e.g. `IMPLEMENTATION_PLAN_my-feature.md`)
-- **Specs** default to `specs/{branch}/` (e.g. `specs/my-feature/`), overridable with `--specs`
-- `ralph plan` and `ralph apply` **must be run on a feature branch** — they'll error on `main` or `master`
-- `ralph status` automatically reads the plan for your current branch
+> **Upgrading existing repos:** Run `ralph init --force` to update scaffold files with OAuth support.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `ralph init` | Scaffold `.ralph/` in current repo |
-| `ralph plan` | Run planning loop (generates implementation plan) |
-| `ralph apply` | Run build loop (implements tasks one at a time) |
+| `ralph init` | Scaffold `.ralph/` in current repo (must be on a feature branch). Use `--force` to overwrite existing files |
+| `ralph plan` | Run planning loop (generates implementation plan from specs) |
+| `ralph apply` | Run build loop (implements tasks from the plan one at a time) |
 | `ralph status` | Progress summary — tasks done, costs, pass/fail |
 
 ### Flags
@@ -93,19 +88,99 @@ Ralph is branch-aware — plans and specs are isolated per branch so parallel fe
 | Flag | Description |
 |------|-------------|
 | `-n, --max <N>` | Limit iterations (e.g. `ralph plan -n 3`) |
-| `--specs <dir>` | Use a custom specs directory (default: `specs/{branch}`) |
+| `--specs <dir>` | Override the specs directory configured in `.ralph/config.yaml` |
+| `--force` | Overwrite existing scaffold files (useful after upgrading ralph) |
 
 Flags can be combined: `ralph plan -n 3 --specs specs/custom-dir`
 
 ## Configuration
 
-After `ralph init`, edit `.ralph/config.yaml` to configure:
+`ralph init` detects your project ecosystem and asks interactive questions about your run command, project goal, and specs directory. The generated `.ralph/config.yaml` can be further customised:
 
 - Project name and agent
 - Backpressure commands (test, typecheck, lint)
 - Phase-specific settings (prompt files, max iterations)
+- Network allowlist (extra domains the container can reach)
+- Dependency directory for volume caching (e.g. `node_modules`, `.venv`)
 
-See `ralph init` output for file locations.
+```yaml
+# Auto-populated by ralph init based on detected ecosystem.
+# Add more domains as needed.
+network:
+  extra_allowed_domains:
+    - pypi.org
+    - files.pythonhosted.org
+
+# Cache dependency directory in a named Docker volume to survive rebuilds
+docker:
+  deps_dir: .venv
+```
+
+## Branch Isolation
+
+Ralph is branch-aware — plans and specs are isolated per branch so parallel features don't collide:
+
+- **All commands** (`init`, `plan`, `apply`) **must be run on a feature branch** — they'll error on `main` or `master`
+- **Specs directory** is chosen during `ralph init`. Preset options (e.g. `specs/`) have the branch appended automatically (e.g. `specs/my-feature/`). Custom paths are used as-is. Overridable per-run with `--specs`
+- **Plans** are stored at `.ralph/plans/IMPLEMENTATION_PLAN_{branch}.md` (e.g. `IMPLEMENTATION_PLAN_my-feature.md`)
+
+## Container Isolation
+
+Ralph runs Claude Code inside a Docker container with a bind-mounted workspace. Changes made by the agent appear on the host filesystem in real time — no sync step required.
+
+### Network Firewall
+
+Outbound network access is restricted to an allowlist of domains via iptables rules configured at container startup. All other outbound traffic is dropped.
+
+**Default allowlist** (always included): `api.anthropic.com`, `claude.ai`, `github.com`, `api.github.com`, `registry.npmjs.org`
+
+`ralph init` automatically adds the package registry domains for your detected ecosystem:
+
+| Ecosystem | Extra Domains |
+|---|---|
+| Python (uv, poetry) | `pypi.org`, `files.pythonhosted.org` |
+| Go | `proxy.golang.org`, `sum.golang.org`, `storage.googleapis.com` |
+| Rust (cargo) | `crates.io`, `static.crates.io`, `index.crates.io` |
+| Node (npm, yarn, pnpm) | _(covered by default allowlist)_ |
+
+You can add more domains in `.ralph/config.yaml` under `network.extra_allowed_domains`.
+
+### Security Layers
+
+| Layer | Threat Mitigated |
+|---|---|
+| Network firewall (iptables) | Data exfiltration to arbitrary hosts |
+| Non-root user (`runuser`) | Privilege escalation, firewall tampering |
+| `no-new-privileges` | Setuid/capability escalation |
+| Env var allowlist | Injection via compromised `.env` |
+| Bind mount scoping | Access to files outside project |
+
+### Recovery
+
+If the agent corrupts workspace files, use `git checkout` or `git stash` to recover — the bind mount means git operates on the same files.
+
+## Important Practices
+
+### Specs
+You can implement a full feature in one shot in a single code repo (a monolith, a monorepo, a microservice, whatever — but a single repo). For this to work **you must provide well-written, clear, unambiguous specs**. Think context engineering, spec-driven development — the results you get will depend on the context you give it.
+
+### Prompts
+`ralph init` generates two prompt files: `.ralph/prompts/plan.md` and `.ralph/prompts/build.md`. These are the instructions that get fed to Claude on every iteration of the plan and build loops respectively. They're yours to customise — tweak them to suit your project, your conventions, your workflow. The defaults are just a solid starting point. Again, this is crucial context.
+
+### Guardrails / Backpressure
+**You must give your build agents clear parameters and guidance**. Automated deterministic guardrails like testing, linting, security checking, etc. You need to do this for precommit hooks (as well as CI) so that the agent will review and fix before committing on each iteration.
+
+There is also the `AGENTS.md`; this is also prepopulated depending on your tech stack, but again you need to review it and tailor it to your conventions, including the validation steps you expect the agent to run, which obviously needs to align with your precommit hooks.
+
+This is where you need to put your engineering hat on. If you're going to expect Claude to implement good quality code consistently, you need to tell it what good looks like and put the guardrails in place.
+
+### Token Usage
+If you're coming from the "human in the loop" approach to agentic engineering — one task at a time — this will use a lot more tokens. And if you don't give it well-written, clear, unambiguous specs and clear guardrails then you will **waste a lot of tokens! You have been warned!!**
+
+### Monitoring
+The CLI gives you well-formatted output of what's going on — thinking, tool use, token use, results. It pays to monitor it closely, at least for the first few iterations.
+
+All of the above is an implementation of the [four foundational agentic patterns](https://www.nibzard.com/agentic-handbook#foundational-patterns-you-can-use-immediately): plan then execute; inversion of control; reflection loop; action trace monitoring & interruption. Running in a loop is not a silver bullet — it needs engineering.
 
 ## Development
 

@@ -18,6 +18,7 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 		Language:        LangPython,
 		LanguageVersion: "3.12",
 		PackageManager:  PmUV,
+		SpecsDir:        "specs",
 		InstallCmd:      "uv sync --all-extras",
 		TestCmd:         "uv run pytest",
 		TypecheckCmd:    "uv run pyright",
@@ -27,7 +28,7 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 		BaseImage:       "node:22-bookworm",
 	}
 
-	result, err := Generate(dir, info)
+	result, err := Generate(dir, "my-feature", info, false)
 	require.NoError(t, err)
 
 	expectedFiles := []string{
@@ -39,7 +40,7 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 		".ralph/docker/entrypoint.sh",
 		".ralph/docker/.dockerignore",
 		".env.example",
-		"specs/.gitkeep",
+		"specs/my-feature/.gitkeep",
 		".ralph/plans/.gitkeep",
 	}
 
@@ -48,6 +49,26 @@ func TestGenerate_CreatesAllFiles(t *testing.T) {
 	}
 
 	assert.GreaterOrEqual(t, len(result.Created), len(expectedFiles))
+	assert.Equal(t, "specs/my-feature", result.SpecsDir)
+}
+
+func TestGenerate_NoBranch(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result, err := Generate(dir, "", info, false)
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(dir, "specs", ".gitkeep"))
+	assert.Equal(t, "specs", result.SpecsDir)
 }
 
 func TestGenerate_ConfigContent(t *testing.T) {
@@ -56,14 +77,16 @@ func TestGenerate_ConfigContent(t *testing.T) {
 		ProjectName:     "myapp",
 		Language:        LangGo,
 		LanguageVersion: "1.25.7",
+		GoVersion:       "1.25.7",
 		PackageManager:  PmGo,
+		SpecsDir:        "specs",
 		InstallCmd:      "go mod download",
 		TestCmd:         "go test ./...",
 		LintCmd:         "golangci-lint run ./...",
 		BaseImage:       "node:22-bookworm",
 	}
 
-	_, err := Generate(dir, info)
+	_, err := Generate(dir, "", info, false)
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "config.yaml"))
@@ -71,6 +94,7 @@ func TestGenerate_ConfigContent(t *testing.T) {
 	s := string(content)
 
 	assert.Contains(t, s, `project: "myapp"`)
+	assert.Contains(t, s, `specs_dir: "specs"`)
 	assert.Contains(t, s, `test: "go test ./..."`)
 	assert.Contains(t, s, `lint: "golangci-lint run ./..."`)
 }
@@ -81,16 +105,17 @@ func TestGenerate_SkipsExistingFiles(t *testing.T) {
 		ProjectName:    "test-project",
 		Language:       LangPython,
 		PackageManager: PmUV,
+		SpecsDir:       "specs",
 		InstallCmd:     "uv sync",
 		TestCmd:        "uv run pytest",
 		BaseImage:      "node:22-bookworm",
 	}
 
-	result1, err := Generate(dir, info)
+	result1, err := Generate(dir, "feat", info, false)
 	require.NoError(t, err)
 	assert.Empty(t, result1.Skipped)
 
-	result2, err := Generate(dir, info)
+	result2, err := Generate(dir, "feat", info, false)
 	require.NoError(t, err)
 
 	assert.Empty(t, result2.Created)
@@ -103,18 +128,19 @@ func TestGenerate_GitignoreIdempotent(t *testing.T) {
 		ProjectName:    "test-project",
 		Language:       LangPython,
 		PackageManager: PmUV,
+		SpecsDir:       "specs",
 		InstallCmd:     "uv sync",
 		TestCmd:        "uv run pytest",
 		BaseImage:      "node:22-bookworm",
 	}
 
-	_, err := Generate(dir, info)
+	_, err := Generate(dir, "", info, false)
 	require.NoError(t, err)
 
 	content1, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
 	require.NoError(t, err)
 
-	_, err = Generate(dir, info)
+	_, err = Generate(dir, "", info, false)
 	require.NoError(t, err)
 
 	content2, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
@@ -132,12 +158,13 @@ func TestGenerate_GitignoreAppendsToExisting(t *testing.T) {
 		ProjectName:    "test-project",
 		Language:       LangNode,
 		PackageManager: PmNPM,
+		SpecsDir:       "specs",
 		InstallCmd:     "npm install",
 		TestCmd:        "npm test",
 		BaseImage:      "node:22-bookworm",
 	}
 
-	_, err := Generate(dir, info)
+	_, err := Generate(dir, "", info, false)
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
@@ -155,12 +182,13 @@ func TestGenerate_EntrypointIsExecutable(t *testing.T) {
 		ProjectName:    "test-project",
 		Language:       LangPython,
 		PackageManager: PmUV,
+		SpecsDir:       "specs",
 		InstallCmd:     "uv sync",
 		TestCmd:        "uv run pytest",
 		BaseImage:      "node:22-bookworm",
 	}
 
-	_, err := Generate(dir, info)
+	_, err := Generate(dir, "", info, false)
 	require.NoError(t, err)
 
 	fi, err := os.Stat(filepath.Join(dir, ".ralph", "docker", "entrypoint.sh"))
@@ -174,13 +202,15 @@ func TestGenerate_DockerfileContent(t *testing.T) {
 		ProjectName:     "test-project",
 		Language:        LangPython,
 		LanguageVersion: "3.12",
+		GoVersion:       DefaultGoVersion,
 		PackageManager:  PmUV,
+		SpecsDir:        "specs",
 		InstallCmd:      "uv sync --all-extras",
 		TestCmd:         "uv run pytest",
 		BaseImage:       "node:22-bookworm",
 	}
 
-	_, err := Generate(dir, info)
+	_, err := Generate(dir, "", info, false)
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "docker", "Dockerfile"))
@@ -189,13 +219,15 @@ func TestGenerate_DockerfileContent(t *testing.T) {
 
 	assert.Contains(t, s, "FROM node:22-bookworm")
 	assert.Contains(t, s, "uv python install 3.12")
+	assert.Contains(t, s, "golang:"+DefaultGoVersion+"-bookworm")
 	assert.Contains(t, s, "ralph")
 }
 
-func TestPrintSummary(t *testing.T) {
+func TestPrintSummary_WithBranch(t *testing.T) {
 	result := &GenerateResult{
-		Created: []string{".ralph/config.yaml", "AGENTS.md"},
-		Skipped: []string{".env.example"},
+		Created:  []string{".ralph/config.yaml", "AGENTS.md"},
+		Skipped:  []string{".env.example"},
+		SpecsDir: "specs/my-feature",
 	}
 
 	var buf bytes.Buffer
@@ -205,4 +237,188 @@ func TestPrintSummary(t *testing.T) {
 	assert.Contains(t, output, "created  .ralph/config.yaml")
 	assert.Contains(t, output, "exists   .env.example")
 	assert.Contains(t, output, "Next steps")
+	assert.Contains(t, output, "specs/my-feature/")
+}
+
+func TestPrintSummary_NoBranch(t *testing.T) {
+	result := &GenerateResult{
+		Created:  []string{".ralph/config.yaml"},
+		SpecsDir: "specs",
+	}
+
+	var buf bytes.Buffer
+	PrintSummary(&buf, result)
+
+	output := buf.String()
+	assert.Contains(t, output, "specs/")
+}
+
+func TestPrintSummary_CustomSpecsDir(t *testing.T) {
+	result := &GenerateResult{
+		Created:  []string{".ralph/config.yaml"},
+		SpecsDir: "docs/requirements/feat-x",
+	}
+
+	var buf bytes.Buffer
+	PrintSummary(&buf, result)
+
+	output := buf.String()
+	assert.Contains(t, output, "docs/requirements/feat-x/")
+}
+
+func TestGenerate_CustomSpecsDirWithBranch(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "docs/specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result, err := Generate(dir, "feat-x", info, false)
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(dir, "docs", "specs", "feat-x", ".gitkeep"))
+	assert.Contains(t, result.Created, "docs/specs/feat-x/.gitkeep")
+	assert.Equal(t, "docs/specs/feat-x", result.SpecsDir)
+}
+
+func TestGenerate_ConfigIncludesSpecsDirExact(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "my/exact/path",
+		SpecsDirExact:  true,
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	_, err := Generate(dir, "feat", info, false)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "config.yaml"))
+	require.NoError(t, err)
+	s := string(content)
+
+	assert.Contains(t, s, `specs_dir: "my/exact/path"`)
+	assert.Contains(t, s, "specs_dir_exact: true")
+}
+
+func TestGenerate_ConfigOmitsSpecsDirExactWhenFalse(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "myapp",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	_, err := Generate(dir, "feat", info, false)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".ralph", "config.yaml"))
+	require.NoError(t, err)
+	s := string(content)
+
+	assert.Contains(t, s, `specs_dir: "specs"`)
+	assert.NotContains(t, s, "specs_dir_exact")
+}
+
+func TestGenerate_ExactSpecsDirSkipsBranch(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "my/custom/path",
+		SpecsDirExact:  true,
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result, err := Generate(dir, "my-feature", info, false)
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(dir, "my", "custom", "path", ".gitkeep"))
+	assert.Equal(t, "my/custom/path", result.SpecsDir)
+}
+
+func TestGenerate_SlashedBranchSanitized(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result, err := Generate(dir, "feature/auth-flow", info, false)
+	require.NoError(t, err)
+
+	assert.Equal(t, "specs/feature-auth-flow", result.SpecsDir)
+	assert.FileExists(t, filepath.Join(dir, "specs", "feature-auth-flow", ".gitkeep"))
+}
+
+func TestGenerate_ForceOverwritesFiles(t *testing.T) {
+	dir := t.TempDir()
+	info := &ProjectInfo{
+		ProjectName:    "test-project",
+		Language:       LangPython,
+		PackageManager: PmUV,
+		SpecsDir:       "specs",
+		InstallCmd:     "uv sync",
+		TestCmd:        "uv run pytest",
+		BaseImage:      "node:22-bookworm",
+	}
+
+	result1, err := Generate(dir, "feat", info, false)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result1.Created)
+	assert.Empty(t, result1.Overwritten)
+
+	result2, err := Generate(dir, "feat", info, true)
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, result2.Overwritten)
+	assert.Empty(t, result2.Created)
+
+	// All template files should be in Overwritten.
+	for _, m := range templateMapping {
+		assert.Contains(t, result2.Overwritten, m.output)
+	}
+
+	// .gitkeep files are not template-rendered so they remain in Skipped.
+	for _, s := range result2.Skipped {
+		assert.Contains(t, s, ".gitkeep")
+	}
+}
+
+func TestPrintSummary_WithOverwritten(t *testing.T) {
+	result := &GenerateResult{
+		Created:     []string{".ralph/config.yaml"},
+		Overwritten: []string{".ralph/prompts/plan.md"},
+		Skipped:     []string{".env.example"},
+		SpecsDir:    "specs/my-feature",
+	}
+
+	var buf bytes.Buffer
+	PrintSummary(&buf, result)
+
+	output := buf.String()
+	assert.Contains(t, output, "created  .ralph/config.yaml")
+	assert.Contains(t, output, "updated  .ralph/prompts/plan.md")
+	assert.Contains(t, output, "exists   .env.example")
 }

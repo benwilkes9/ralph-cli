@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/benwilkes9/ralph-cli/internal/git"
 )
 
 //go:embed all:templates
@@ -33,6 +35,21 @@ var templateMapping = []struct {
 	{"templates/env.example.tmpl", ".env.example"},
 }
 
+// RootFiles returns output paths from the template mapping that live outside
+// .ralph/ (e.g. "AGENTS.md", ".env.example"). Preflight uses this to stage
+// all init-generated files without hardcoding paths.
+func RootFiles() []string {
+	var roots []string
+	for _, m := range templateMapping {
+		if !strings.HasPrefix(m.output, ".ralph/") {
+			roots = append(roots, m.output)
+		}
+	}
+	// .gitignore is appended by init, not from a template mapping entry.
+	roots = append(roots, ".gitignore")
+	return roots
+}
+
 // gitignoreEntries are lines to append to .gitignore idempotently.
 var gitignoreEntries = []string{
 	".ralph/logs/",
@@ -40,23 +57,30 @@ var gitignoreEntries = []string{
 	".env",
 }
 
-// GenerateResult tracks which files were created or skipped.
+// GenerateResult tracks which files were created, overwritten, or skipped.
 type GenerateResult struct {
-	Created []string
-	Skipped []string
+	Created     []string
+	Overwritten []string
+	Skipped     []string
+	SpecsDir    string // resolved specs directory including sanitized branch (e.g. "specs/my-feature")
 }
 
 // Generate renders all templates into the repo, skipping existing files.
-func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
+// branch is the current git branch used to resolve the specs directory;
+// if empty, the base SpecsDir is used as-is.
+// When force is true, existing files are overwritten instead of skipped.
+func Generate(repoRoot, branch string, info *ProjectInfo, force bool) (*GenerateResult, error) {
 	result := &GenerateResult{}
 
 	for _, mapping := range templateMapping {
 		outputPath := filepath.Join(repoRoot, mapping.output)
 
-		if fileExists(outputPath) {
+		if !force && fileExists(outputPath) {
 			result.Skipped = append(result.Skipped, mapping.output)
 			continue
 		}
+
+		overwriting := force && fileExists(outputPath)
 
 		if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
 			return nil, fmt.Errorf("creating directory for %s: %w", mapping.output, err)
@@ -83,15 +107,25 @@ func Generate(repoRoot string, info *ProjectInfo) (*GenerateResult, error) {
 			}
 		}
 
-		result.Created = append(result.Created, mapping.output)
+		if overwriting {
+			result.Overwritten = append(result.Overwritten, mapping.output)
+		} else {
+			result.Created = append(result.Created, mapping.output)
+		}
 	}
 
-	// Create .gitkeep files for specs/ and .ralph/plans/ directories.
+	specsDir := info.SpecsDir
+	if branch != "" && !info.SpecsDirExact {
+		specsDir = info.SpecsDir + "/" + git.SanitizeBranch(branch)
+	}
+	result.SpecsDir = specsDir
+
+	// Create .gitkeep files for specs and .ralph/plans/ directories.
 	for _, dir := range []struct {
 		path    string
 		display string
 	}{
-		{filepath.Join(repoRoot, "specs"), "specs/.gitkeep"},
+		{filepath.Join(repoRoot, specsDir), specsDir + "/.gitkeep"},
 		{filepath.Join(repoRoot, ".ralph", "plans"), ".ralph/plans/.gitkeep"},
 	} {
 		gk := filepath.Join(dir.path, ".gitkeep")
@@ -187,17 +221,18 @@ func PrintSummary(w io.Writer, result *GenerateResult) {
 	for _, f := range result.Created {
 		printLine(w, "  created  "+f)
 	}
+	for _, f := range result.Overwritten {
+		printLine(w, "  updated  "+f)
+	}
 	for _, f := range result.Skipped {
 		printLine(w, "  exists   "+f)
 	}
 	printLine(w, "")
 	printLine(w, "Next steps:")
-	printLine(w, "  1. Edit .env with your API keys - see .env.example for reference")
-	printLine(w, "  2. Review .ralph/config.yaml")
-	printLine(w, "  3. Review the prompts in .ralph/prompts/")
-	printLine(w, "  4. Review AGENTS.md")
-	printLine(w, "  5. Ensure the requirements are in the specs/ directory")
-	printLine(w, "  6. Run: ralph plan")
+	printLine(w, "  1. Edit .env with your credentials — see .env.example for reference")
+	printLine(w, "  2. Review .ralph/config.yaml and .ralph/prompts/")
+	printLine(w, fmt.Sprintf("  3. Add your specs to %s/", result.SpecsDir))
+	printLine(w, "  4. Run: ralph plan (scaffold files will be auto-committed)")
 }
 
 func printLine(w io.Writer, s string) {

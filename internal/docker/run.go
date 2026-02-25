@@ -2,19 +2,26 @@ package docker
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
+	"strings"
 )
+
+const osDarwin = "darwin"
 
 // RunOptions configures a docker run invocation.
 type RunOptions struct {
-	ImageTag string
-	Mode     string // "plan" or "build"
-	MaxIter  int
-	Branch   string
-	Repo     string
-	LogsDir  string
-	PlanFile string
-	SpecsDir string
+	ImageTag       string
+	Mode           string // "plan" or "build"
+	MaxIter        int
+	Branch         string
+	ProjectDir     string // host project root for bind mount
+	PlanFile       string
+	SpecsDir       string
+	AllowedDomains []string   // merged default + extra
+	DepsDir        string     // relative path for dep volume overlay (e.g. "node_modules"), empty = none
+	ProjectName    string     // for volume naming
+	Auth           AuthMethod // which credential to pass into the container
 }
 
 // Run executes docker run with the given options, attaching stdin/stdout/stderr.
@@ -23,24 +30,52 @@ func Run(opts *RunOptions) error {
 }
 
 func runWithRunner(runner CommandRunner, opts *RunOptions) error {
+	authEnv := "ANTHROPIC_API_KEY"
+	if opts.Auth == AuthOAuth {
+		authEnv = "CLAUDE_CODE_OAUTH_TOKEN"
+	}
+
 	args := []string{
 		"run", "--rm", "-it",
 		"--security-opt", "no-new-privileges",
-		"-e", "ANTHROPIC_API_KEY",
+		"--cap-add", "NET_ADMIN",
+		"-e", authEnv,
 		"-e", "GITHUB_PAT",
-		"-e", "REPO=" + opts.Repo,
 		"-e", "BRANCH=" + opts.Branch,
 		"-e", "PLAN_FILE=" + opts.PlanFile,
 		"-e", "SPECS_DIR=" + opts.SpecsDir,
-		"-v", opts.LogsDir + ":/app/logs",
+		"-e", "ALLOWED_DOMAINS=" + strings.Join(opts.AllowedDomains, ","),
+		"-v", bindMount(opts.ProjectDir, "/workspace/repo"),
+	}
+
+	if opts.DepsDir != "" {
+		args = append(args,
+			"-v", depsVolume(opts.ProjectName)+":/workspace/repo/"+opts.DepsDir,
+			"-e", "DEPS_DIR="+opts.DepsDir,
+		)
+	}
+
+	args = append(args,
 		opts.ImageTag,
 		"--",
 		opts.Mode,
 		strconv.Itoa(opts.MaxIter),
-	}
+	)
 
 	if err := runner.Run("docker", args...); err != nil {
 		return fmt.Errorf("docker run: %w", err)
 	}
 	return nil
+}
+
+func bindMount(hostDir, containerDir string) string {
+	m := hostDir + ":" + containerDir
+	if runtime.GOOS == osDarwin {
+		m += ":delegated"
+	}
+	return m
+}
+
+func depsVolume(projectName string) string {
+	return "ralph-deps-" + projectName
 }

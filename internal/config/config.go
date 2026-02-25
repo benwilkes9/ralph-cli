@@ -11,12 +11,16 @@ import (
 
 // Config holds the ralph project configuration loaded from .ralph/config.yaml.
 type Config struct {
-	Project string `yaml:"project"`
-	Agent   string `yaml:"agent"`
+	Project       string `yaml:"project"`
+	Agent         string `yaml:"agent"`
+	SpecsDir      string `yaml:"specs_dir,omitempty"`       // specs directory, e.g. "specs" or "my/custom/path"
+	SpecsDirExact bool   `yaml:"specs_dir_exact,omitempty"` // when true, specs_dir is used as-is (branch not appended)
 
 	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
 	Backpressure      Backpressure `yaml:"backpressure"`
 	Phases            Phases       `yaml:"phases"`
+	Network           Network      `yaml:"network,omitempty"`
+	Docker            Docker       `yaml:"docker,omitempty"`
 }
 
 // Backpressure defines the commands used to validate code quality between iterations.
@@ -24,6 +28,16 @@ type Backpressure struct {
 	Test      string `yaml:"test"`
 	Typecheck string `yaml:"typecheck"`
 	Lint      string `yaml:"lint"`
+}
+
+// Network holds network isolation settings for the Docker container.
+type Network struct {
+	ExtraAllowedDomains []string `yaml:"extra_allowed_domains,omitempty"`
+}
+
+// Docker holds Docker-specific settings.
+type Docker struct {
+	DepsDir string `yaml:"deps_dir,omitempty"` // relative to project root, e.g. "node_modules"
 }
 
 // Phases groups the plan and build phase configurations.
@@ -86,6 +100,23 @@ func (c *Config) validate() error {
 	if c.Phases.Build.MaxIterations > 100 {
 		return fmt.Errorf("phases.build.max_iterations exceeds maximum (100)")
 	}
+
+	if c.Docker.DepsDir != "" {
+		clean := filepath.Clean(c.Docker.DepsDir)
+		if filepath.IsAbs(clean) || clean == "." || clean == ".." ||
+			strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("docker.deps_dir must be a relative path within the project, got %q", c.Docker.DepsDir)
+		}
+	}
+
+	if c.SpecsDir != "" {
+		clean := filepath.Clean(c.SpecsDir)
+		if filepath.IsAbs(clean) || clean == "." || clean == ".." ||
+			strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("specs_dir must be a relative path within the project, got %q", c.SpecsDir)
+		}
+	}
+
 	return nil
 }
 
@@ -111,6 +142,20 @@ func (c *Config) applyDefaults() {
 	if c.Phases.Build.MaxIterations == 0 {
 		c.Phases.Build.MaxIterations = 20
 	}
+}
+
+// SpecsDirForBranch returns the resolved specs directory path.
+// When SpecsDirExact is true, SpecsDir is returned as-is.
+// Otherwise the sanitized branch is appended: e.g. "specs" → "specs/my-feature".
+func (c *Config) SpecsDirForBranch(sanitizedBranch string) string {
+	base := c.SpecsDir
+	if base == "" {
+		base = "specs"
+	}
+	if c.SpecsDirExact {
+		return base
+	}
+	return base + "/" + sanitizedBranch
 }
 
 // PlanPathForBranch returns the branch-specific plan file path.

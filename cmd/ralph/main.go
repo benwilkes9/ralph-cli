@@ -24,10 +24,11 @@ var version = "dev"
 
 func main() {
 	root := &cobra.Command{
-		Use:          "ralph",
-		Short:        "Autonomous plan/build iteration using Claude Code",
-		Version:      version,
-		SilenceUsage: true,
+		Use:           "ralph",
+		Short:         "Autonomous plan/build iteration using Claude Code",
+		Version:       version,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	orch := realOrchestrator{}
@@ -44,13 +45,26 @@ func main() {
 }
 
 func initCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Scaffold .ralph/ in current repo",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			force, err := cmd.Flags().GetBool("force")
+			if err != nil {
+				return fmt.Errorf("reading --force flag: %w", err)
+			}
+
 			repoRoot, err := git.RepoRoot()
 			if err != nil {
 				return fmt.Errorf("finding repo root: %w", err)
+			}
+
+			branch, err := git.Branch()
+			if err != nil {
+				return fmt.Errorf("getting current branch: %w", err)
+			}
+			if git.IsProtectedBranch(branch, []string{"main", "master"}) {
+				return fmt.Errorf("ralph init must be run on a feature branch, not %q — create one first: git checkout -b my-feature", branch)
 			}
 
 			info := scaffold.Detect(repoRoot)
@@ -60,11 +74,12 @@ func initCmd() *cobra.Command {
 				In:         cmd.InOrStdin(),
 				Out:        cmd.OutOrStdout(),
 				Accessible: !isTerminal,
+				Branch:     branch,
 			}); err != nil {
 				return fmt.Errorf("running prompts: %w", err)
 			}
 
-			result, err := scaffold.Generate(repoRoot, info)
+			result, err := scaffold.Generate(repoRoot, branch, info, force)
 			if err != nil {
 				return fmt.Errorf("generating scaffold: %w", err)
 			}
@@ -73,6 +88,8 @@ func initCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().Bool("force", false, "Overwrite existing scaffold files")
+	return cmd
 }
 
 // validateRelativePath returns an error if path is absolute or escapes the
@@ -145,7 +162,7 @@ func resolveRunParams(cmd *cobra.Command) (*runParams, error) {
 
 	sanitized := git.SanitizeBranch(branch)
 	if specsDir == "" {
-		specsDir = "specs/" + sanitized
+		specsDir = cfg.SpecsDirForBranch(sanitized)
 	}
 	planFile := cfg.PlanPathForBranch(sanitized)
 
@@ -183,11 +200,28 @@ func planCmd(orch Orchestrator) *cobra.Command {
 				}
 			}
 
+			// Verify at least one .md spec exists before launching Docker.
+			specsPath := filepath.Join(p.repoRoot, p.specsDir)
+			entries, err := os.ReadDir(specsPath)
+			if err != nil {
+				return fmt.Errorf("reading specs directory %q: %w", p.specsDir, err)
+			}
+			hasSpec := false
+			for _, e := range entries {
+				if !e.IsDir() && filepath.Ext(e.Name()) == ".md" {
+					hasSpec = true
+					break
+				}
+			}
+			if !hasSpec {
+				return fmt.Errorf("no .md specs found in %s/ — add at least one spec before running plan", p.specsDir)
+			}
+
 			return orch.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
-	cmd.Flags().String("specs", "", "specs directory (default: specs/{branch})")
+	cmd.Flags().String("specs", "", "specs directory (overrides specs_dir in config)")
 	return cmd
 }
 
@@ -210,7 +244,7 @@ func applyCmd(orch Orchestrator) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
-	cmd.Flags().String("specs", "", "specs directory (default: specs/{branch})")
+	cmd.Flags().String("specs", "", "specs directory (overrides specs_dir in config)")
 	return cmd
 }
 
@@ -326,7 +360,7 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 	}
 	specsDir := os.Getenv("SPECS_DIR")
 	if specsDir == "" {
-		specsDir = "specs/" + git.SanitizeBranch(branch)
+		specsDir = cfg.SpecsDirForBranch(git.SanitizeBranch(branch))
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)

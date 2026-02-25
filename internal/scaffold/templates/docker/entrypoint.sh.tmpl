@@ -3,9 +3,10 @@ set -euo pipefail
 
 # ─── Validate required env vars ─────────────────────────────────
 missing=()
-[ -z "${ANTHROPIC_API_KEY:-}" ] && missing+=("ANTHROPIC_API_KEY")
-[ -z "${GITHUB_PAT:-}" ]       && missing+=("GITHUB_PAT")
-[ -z "${REPO:-}" ]             && missing+=("REPO")
+if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+    missing+=("ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN")
+fi
+[ -z "${GITHUB_PAT:-}" ] && missing+=("GITHUB_PAT")
 [ -z "${BRANCH:-}" ]           && missing+=("BRANCH")
 
 if [ ${#missing[@]} -gt 0 ]; then
@@ -13,33 +14,62 @@ if [ ${#missing[@]} -gt 0 ]; then
     exit 1
 fi
 
-# ─── Git config ──────────────────────────────────────────────────
-git config --global user.name "Claude"
-git config --global user.email "noreply@anthropic.com"
-git config --global commit.gpgsign false
+# ─── Git config (as claude — global config lives in ~claude) ──────
+runuser -u claude -- git config --global user.name "Claude"
+runuser -u claude -- git config --global user.email "noreply@anthropic.com"
+runuser -u claude -- git config --global commit.gpgsign false
+runuser -u claude -- git config --global --add safe.directory /workspace/repo
 
 # ─── Git credentials (avoid embedding token in URLs) ─────────────
-git config --global credential.helper store
-printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' "$GITHUB_PAT" \
-    | git credential approve
+runuser -u claude -- git config --global credential.helper store
+runuser -u claude -- bash -c "printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' \
+    \"\$GITHUB_PAT\" | git credential approve"
 unset GITHUB_PAT
 
-# ─── Clone repo ──────────────────────────────────────────────────
-cd /workspace/repo
-git init
-git remote add origin "https://github.com/${REPO}.git"
-if ! git fetch origin "$BRANCH" 2>/dev/null; then
-    echo "Error: branch '$BRANCH' not found on remote '${REPO}'." >&2
-    echo "Push it first:  git push -u origin $BRANCH" >&2
-    exit 1
+# ─── Network firewall (runs as root) ─────────────────────────────
+if [ -n "${ALLOWED_DOMAINS:-}" ]; then
+    echo "Configuring network firewall..."
+
+    iptables -F OUTPUT 2>/dev/null || true
+
+    iptables -A OUTPUT -o lo -j ACCEPT
+    iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    # Only allow DNS to the container's configured resolver(s), not arbitrary IPs.
+    while IFS= read -r ns; do
+        iptables -A OUTPUT -d "$ns" -p udp --dport 53 -j ACCEPT
+        iptables -A OUTPUT -d "$ns" -p tcp --dport 53 -j ACCEPT
+    done < <(awk '/^nameserver/{print $2}' /etc/resolv.conf)
+
+    IFS=',' read -ra DOMAINS <<< "$ALLOWED_DOMAINS"
+    for domain in "${DOMAINS[@]}"; do
+        domain=$(echo "$domain" | xargs)
+        ips=$(getent ahostsv4 "$domain" 2>/dev/null \
+            | awk '{print $1}' | sort -u || true)
+        if [ -z "$ips" ]; then
+            echo "  Warning: could not resolve $domain" >&2
+            continue
+        fi
+        for ip in $ips; do
+            iptables -A OUTPUT -d "$ip" -p tcp --dport 443 -j ACCEPT
+            iptables -A OUTPUT -d "$ip" -p tcp --dport 80 -j ACCEPT
+        done
+    done
+
+    iptables -A OUTPUT -j DROP
+    unset ALLOWED_DOMAINS
+    echo "Firewall configured."
 fi
-git checkout -b "$BRANCH" "origin/$BRANCH"
 
-# ─── Install project dependencies ───────────────────────────────
-{{.InstallCmd}}
+# ─── Fix deps volume ownership (Docker creates named volumes as root) ─
+if [ -n "${DEPS_DIR:-}" ]; then
+    # Defense-in-depth: reject traversal even though the Go side validates too.
+    case "$DEPS_DIR" in
+        /*|..|../*|*/../*|.) echo "Error: invalid DEPS_DIR: $DEPS_DIR" >&2; exit 1 ;;
+    esac
+    chown claude:claude "/workspace/repo/$DEPS_DIR"
+fi
 
-# ─── Claude Code settings ────────────────────────────────────────
+# ─── Drop to non-root user, install deps, and run ────────────────
+cd /workspace/repo
 export DISABLE_AUTOUPDATER=1
-
-# ─── Hand off to ralph loop ──────────────────────────────────────
-exec ralph _loop "$@"
+exec runuser -u claude -- bash -c '{{.InstallCmd}} && exec ralph _loop "$@"' -- "$@"

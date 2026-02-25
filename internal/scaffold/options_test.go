@@ -80,6 +80,26 @@ func TestRunCmdTitle_Unknown(t *testing.T) {
 	assert.Equal(t, "How do you start the application?", title)
 }
 
+func TestSpecsDirOptions_WithBranch(t *testing.T) {
+	opts := specsDirOptions("my-feature")
+
+	require.Len(t, opts, 3)
+	assertOptionValue(t, opts[0], "specs")
+	assertOptionValue(t, opts[1], "docs/specs")
+	assertOptionValue(t, opts[len(opts)-1], customSentinel)
+
+	// Descriptions should contain the concrete branch name.
+	assert.Contains(t, opts[0].Key, "specs/my-feature/")
+	assert.Contains(t, opts[1].Key, "docs/specs/my-feature/")
+}
+
+func TestSpecsDirOptions_NoBranch(t *testing.T) {
+	opts := specsDirOptions("")
+
+	require.Len(t, opts, 3)
+	assert.Contains(t, opts[0].Key, "specs/<branch>/")
+}
+
 func TestAllOptionSetsEndWithCustom(t *testing.T) {
 	pms := []PackageManager{PmUV, PmPoetry, PmNPM, PmYarn, PmPNPM, PmGo, PmCargo, PmUnknown}
 	for _, pm := range pms {
@@ -94,4 +114,7 @@ func TestAllOptionSetsEndWithCustom(t *testing.T) {
 		last := opts[len(opts)-1]
 		assertOptionValue(t, last, customSentinel)
 	}
+
+	specsOpts := specsDirOptions("")
+	assertOptionValue(t, specsOpts[len(specsOpts)-1], customSentinel)
 }

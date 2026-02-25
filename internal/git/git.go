@@ -90,6 +90,20 @@ func IsTracked(path string) (bool, error) {
 	return true, nil
 }
 
+// HasStagedChanges returns true if there are changes in the staging area.
+func HasStagedChanges() (bool, error) {
+	cmd := exec.CommandContext(context.Background(), "git", "diff", "--cached", "--quiet") //nolint:gosec // hardcoded args
+	err := cmd.Run()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return true, nil // exit 1 = there are staged changes
+		}
+		return false, fmt.Errorf("git diff --cached: %w", err)
+	}
+	return false, nil // exit 0 = clean
+}
+
 // BranchExistsOnRemote returns true if the branch exists on the origin remote.
 func BranchExistsOnRemote(branch string) (bool, error) {
 	out, err := run("ls-remote", "--heads", "origin", "refs/heads/"+branch)
@@ -140,6 +154,10 @@ func run(args ...string) (string, error) {
 	cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // args are hardcoded by callers in this package
 	out, err := cmd.Output()
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("git %s: %w\n%s", args[0], err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return "", fmt.Errorf("git %s: %w", args[0], err)
 	}
 	return string(out), nil

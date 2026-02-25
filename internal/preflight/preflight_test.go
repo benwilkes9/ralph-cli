@@ -25,6 +25,18 @@ func gitLog(t *testing.T, dir string) string {
 	return string(out)
 }
 
+func gitShow(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	fullArgs := append([]string{"show"}, args...)                        //nolint:gocritic // append to separate slice is intentional
+	cmd := exec.CommandContext(context.Background(), "git", fullArgs...) //nolint:gosec // args are test-controlled
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git show failed: %s", err)
+	}
+	return string(out)
+}
+
 func gitDiff(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	fullArgs := append([]string{"diff"}, args...)                        //nolint:gocritic // append to separate slice is intentional
@@ -42,6 +54,9 @@ func writeScaffold(t *testing.T, dir string) {
 	ralphDir := filepath.Join(dir, ".ralph")
 	require.NoError(t, os.MkdirAll(ralphDir, 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(ralphDir, "config.yaml"), []byte("project: test"), 0o600))
+	// Root-level files also created by ralph init.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("# Agents"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env.example"), []byte("ANTHROPIC_API_KEY="), 0o600))
 }
 
 func TestCheck_ConfigMissing(t *testing.T) {
@@ -61,9 +76,37 @@ func TestCheck_AutoCommitsUntracked(t *testing.T) {
 	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
 	require.NoError(t, err)
 
-	// Verify .ralph/ was committed.
+	// Verify all scaffold files were committed in a single commit.
 	log := gitLog(t, clone)
 	assert.Contains(t, log, "chore: scaffold ralph")
+
+	// Verify root-level files were included in the commit.
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "AGENTS.md")
+	assert.Contains(t, show, ".env.example")
+	assert.Contains(t, show, ".ralph/config.yaml")
+}
+
+func TestCheck_AutoCommitsRootFilesWhenRalphAlreadyTracked(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
+	writeScaffold(t, clone)
+
+	// Simulate a previous run that only committed .ralph/ but missed root files.
+	testutil.RunGit(t, clone, "add", ".ralph/")
+	testutil.RunGit(t, clone, "commit", "-m", "add scaffold (partial)")
+	testutil.RunGit(t, clone, "push", "origin", "main")
+
+	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
+	require.NoError(t, err)
+
+	// Verify root-level files were committed in a follow-up scaffold commit.
+	log := gitLog(t, clone)
+	assert.Contains(t, log, "chore: scaffold ralph")
+
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "AGENTS.md")
+	assert.Contains(t, show, ".env.example")
 }
 
 func TestCheck_AutoPushesBranch(t *testing.T) {
@@ -80,7 +123,7 @@ func TestCheck_AutoPushesBranch(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheck_AutoPushesUnpushedChanges(t *testing.T) {
+func TestCheck_UnpushedChanges_NoAutoPush(t *testing.T) {
 	_, clone := testutil.InitBareAndClone(t)
 	testutil.Chdir(t, clone)
 	writeScaffold(t, clone)
@@ -95,8 +138,13 @@ func TestCheck_AutoPushesUnpushedChanges(t *testing.T) {
 	testutil.RunGit(t, clone, "add", ".ralph/")
 	testutil.RunGit(t, clone, "commit", "-m", "update scaffold")
 
+	// Should succeed without pushing (bind mount reads host files directly).
 	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
 	require.NoError(t, err)
+
+	// Verify the unpushed changes are NOT auto-pushed.
+	diff := gitDiff(t, clone, "origin/main", "--", ".ralph/")
+	assert.NotEmpty(t, diff, "expected unpushed changes to remain — preflight should not auto-push")
 }
 
 func TestCheck_AutoCommitsSpecsDir(t *testing.T) {
@@ -118,7 +166,10 @@ func TestCheck_AutoCommitsSpecsDir(t *testing.T) {
 	require.NoError(t, err)
 
 	log := gitLog(t, clone)
-	assert.Contains(t, log, "chore: add requirements/v2 directory")
+	assert.Contains(t, log, "chore: scaffold ralph")
+
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "requirements/v2/.gitkeep")
 }
 
 func TestCheck_AutoCommitsPlansDir(t *testing.T) {
@@ -140,10 +191,13 @@ func TestCheck_AutoCommitsPlansDir(t *testing.T) {
 	require.NoError(t, err)
 
 	log := gitLog(t, clone)
-	assert.Contains(t, log, "chore: add custom/plans directory")
+	assert.Contains(t, log, "chore: scaffold ralph")
+
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, "custom/plans/.gitkeep")
 }
 
-func TestCheck_AutoPushesCustomPlanDir(t *testing.T) {
+func TestCheck_CustomPlanDir_NoAutoPush(t *testing.T) {
 	_, clone := testutil.InitBareAndClone(t)
 	testutil.Chdir(t, clone)
 	writeScaffold(t, clone)
@@ -162,13 +216,35 @@ func TestCheck_AutoPushesCustomPlanDir(t *testing.T) {
 	testutil.RunGit(t, clone, "add", "plans/")
 	testutil.RunGit(t, clone, "commit", "-m", "add plan")
 
-	// Check should push the custom plans/ dir to origin.
+	// Should succeed without pushing (bind mount reads host files directly).
 	err := Check("main", "specs", "plans/IMPLEMENTATION_PLAN_main.md")
 	require.NoError(t, err)
 
-	// Verify the plan was pushed — no diff between local and remote.
+	// Verify the plan was NOT auto-pushed — diff should still exist.
 	diff := gitDiff(t, clone, "origin/main", "--", "plans/")
-	assert.Empty(t, diff, "expected custom plan dir to be pushed, but got diff:\n%s", diff)
+	assert.NotEmpty(t, diff, "expected unpushed changes to remain — preflight should not auto-push")
+}
+
+func TestCheck_AutoCommitsModifiedGitignore(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	testutil.Chdir(t, clone)
+
+	// Create and commit a .gitignore, then scaffold.
+	require.NoError(t, os.WriteFile(filepath.Join(clone, ".gitignore"), []byte("*.pyc\n"), 0o600))
+	testutil.RunGit(t, clone, "add", ".gitignore")
+	testutil.RunGit(t, clone, "commit", "-m", "add gitignore")
+	testutil.RunGit(t, clone, "push", "origin", "main")
+
+	writeScaffold(t, clone)
+	// Simulate ralph init appending to .gitignore (file is already tracked).
+	require.NoError(t, os.WriteFile(filepath.Join(clone, ".gitignore"), []byte("*.pyc\n.ralph/logs/\n.env\n"), 0o600))
+
+	err := Check("main", "specs", ".ralph/plans/IMPLEMENTATION_PLAN_main.md")
+	require.NoError(t, err)
+
+	// Verify .gitignore was included in the scaffold commit.
+	show := gitShow(t, clone, "HEAD", "--name-only")
+	assert.Contains(t, show, ".gitignore")
 }
 
 func TestCheck_AllClean(t *testing.T) {
