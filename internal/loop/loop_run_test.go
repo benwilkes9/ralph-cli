@@ -15,6 +15,7 @@ import (
 
 	"github.com/benwilkes9/ralph-cli/internal/state"
 	"github.com/benwilkes9/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // --- fakes ---
@@ -72,6 +73,8 @@ func iterStats() *stream.IterationStats {
 	return &stream.IterationStats{PeakContext: 1000, Cost: 0.01}
 }
 
+var runTheme = ui.DefaultTheme()
+
 // --- tests ---
 
 func TestRun_MaxIterationsExits(t *testing.T) {
@@ -82,7 +85,7 @@ func TestRun_MaxIterationsExits(t *testing.T) {
 	c := &fakeClaude{stats: iterStats()}
 
 	var buf bytes.Buffer
-	err := run(context.Background(), opts, &buf, g, c)
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, c.called)
@@ -105,7 +108,7 @@ func TestRun_CancellationBeforeLoop(t *testing.T) {
 	c := &fakeClaude{stats: iterStats()}
 
 	var buf bytes.Buffer
-	err := run(ctx, opts, &buf, g, c)
+	err := run(ctx, opts, &buf, runTheme, g, c)
 	assert.True(t, errors.Is(err, context.Canceled))
 	assert.Equal(t, 0, c.called, "claude should not be invoked when context is already cancelled")
 
@@ -124,7 +127,7 @@ func TestRun_StaleAbort(t *testing.T) {
 	c := &fakeClaude{stats: iterStats()}
 
 	var buf bytes.Buffer
-	err := run(context.Background(), opts, &buf, g, c)
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
 	require.NoError(t, err)
 
 	assert.Equal(t, DefaultMaxStale, c.called)
@@ -144,7 +147,7 @@ func TestRun_AlternatingHeadsNoStale(t *testing.T) {
 	c := &fakeClaude{stats: iterStats()}
 
 	var buf bytes.Buffer
-	err := run(context.Background(), opts, &buf, g, c)
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
 	require.NoError(t, err)
 
 	assert.Equal(t, 3, c.called)
@@ -166,11 +169,12 @@ func TestRun_PushFallback(t *testing.T) {
 	c := &fakeClaude{stats: iterStats()}
 
 	var buf bytes.Buffer
-	err := run(context.Background(), opts, &buf, g, c)
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "Failed to push. Creating remote branch...")
+	assert.Contains(t, out, "Failed to push")
+	assert.Contains(t, out, "Creating remote branch")
 	assert.True(t, g.upstreamCalled, "PushSetUpstream should be called on push failure")
 }
 

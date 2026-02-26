@@ -8,7 +8,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
+
+func newTestFormatter() (*bytes.Buffer, *Formatter) {
+	var buf bytes.Buffer
+	return &buf, NewFormatter(&buf, ui.DefaultTheme())
+}
 
 func TestFormatTokensFloor(t *testing.T) {
 	tests := []struct {
@@ -36,8 +43,7 @@ func TestFormatTokensFloor(t *testing.T) {
 }
 
 func TestFormatTextBlock(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "assistant",
@@ -53,13 +59,10 @@ func TestFormatTextBlock(t *testing.T) {
 
 	got := buf.String()
 	assert.Contains(t, got, "Hello world")
-	assert.Contains(t, got, Bold)
-	assert.Contains(t, got, White)
 }
 
 func TestFormatRegularToolUse(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "assistant",
@@ -80,12 +83,10 @@ func TestFormatRegularToolUse(t *testing.T) {
 	got := buf.String()
 	assert.Contains(t, got, "· Read")
 	assert.Contains(t, got, "/workspace/repo/main.go")
-	assert.Contains(t, got, Dim)
 }
 
 func TestFormatTaskToolUse(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "assistant",
@@ -106,12 +107,10 @@ func TestFormatTaskToolUse(t *testing.T) {
 	got := buf.String()
 	assert.Contains(t, got, "▶ Bash")
 	assert.Contains(t, got, `"Run all tests"`)
-	assert.Contains(t, got, BoldCyan)
 }
 
 func TestFormatTaskWithModelHint(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "assistant",
@@ -135,8 +134,7 @@ func TestFormatTaskWithModelHint(t *testing.T) {
 }
 
 func TestFormatSubagentCompleted(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "user",
@@ -152,15 +150,13 @@ func TestFormatSubagentCompleted(t *testing.T) {
 
 	got := buf.String()
 	assert.Contains(t, got, "✓")
-	assert.Contains(t, got, Green)
 	assert.Contains(t, got, "19s")
 	assert.Contains(t, got, "3 tool calls")
 	assert.Contains(t, got, "8.7k tokens")
 }
 
 func TestFormatSubagentFailed(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "user",
@@ -175,12 +171,10 @@ func TestFormatSubagentFailed(t *testing.T) {
 	got := buf.String()
 	assert.Contains(t, got, "✗")
 	assert.Contains(t, got, "error")
-	assert.Contains(t, got, BoldRed)
 }
 
 func TestFormatIgnoresSystemAndResult(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	for _, evtType := range []string{"system", "result"} {
 		buf.Reset()
@@ -191,8 +185,7 @@ func TestFormatIgnoresSystemAndResult(t *testing.T) {
 }
 
 func TestFormatUserWithoutTotalTokens(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "user",
@@ -256,8 +249,7 @@ func TestExtractParamTruncation(t *testing.T) {
 }
 
 func TestFormatTaskFallbackSubagentType(t *testing.T) {
-	var buf bytes.Buffer
-	f := NewFormatter(&buf)
+	buf, f := newTestFormatter()
 
 	evt := &Event{
 		Type: "assistant",

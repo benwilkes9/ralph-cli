@@ -23,7 +23,7 @@ go install github.com/benwilkes9/ralph-cli/cmd/ralph@latest
 ## Quick Start
 
 ```bash
-# 1. Create a feature branch (init/plan/apply won't run on main or master)
+# 1. Create a feature branch (init/plan/build won't run on main or master)
 git checkout -b my-feature
 
 # 2. Scaffold .ralph/ — interactive prompts will ask about your project
@@ -43,7 +43,7 @@ specs/my-feature/my-spec-2.md
 ralph plan
 
 # 6. Run build loop (reads from the implementation plan, implements tasks one at a time)
-ralph apply
+ralph build
 
 # 7. Check progress
 ralph status
@@ -80,7 +80,7 @@ If you have a Claude Max subscription, you can use your subscription instead of 
 |---------|-------------|
 | `ralph init` | Scaffold `.ralph/` in current repo (must be on a feature branch). Use `--force` to overwrite existing files |
 | `ralph plan` | Run planning loop (generates implementation plan from specs) |
-| `ralph apply` | Run build loop (implements tasks from the plan one at a time) |
+| `ralph build` | Run build loop (implements tasks from the plan one at a time) |
 | `ralph status` | Progress summary — tasks done, costs, pass/fail |
 
 ### Flags
@@ -120,7 +120,7 @@ docker:
 
 Ralph is branch-aware — plans and specs are isolated per branch so parallel features don't collide:
 
-- **All commands** (`init`, `plan`, `apply`) **must be run on a feature branch** — they'll error on `main` or `master`
+- **All commands** (`init`, `plan`, `build`) **must be run on a feature branch** — they'll error on `main` or `master`
 - **Specs directory** is chosen during `ralph init`. Preset options (e.g. `specs/`) have the branch appended automatically (e.g. `specs/my-feature/`). Custom paths are used as-is. Overridable per-run with `--specs`
 - **Plans** are stored at `.ralph/plans/IMPLEMENTATION_PLAN_{branch}.md` (e.g. `IMPLEMENTATION_PLAN_my-feature.md`)
 

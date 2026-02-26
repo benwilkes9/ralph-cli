@@ -11,7 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/benwilkes9/ralph-cli/internal/state"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
+
+var testTheme = ui.DefaultTheme()
 
 const samplePlan = `# Implementation Plan
 
@@ -156,19 +159,22 @@ func TestRender(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	Render(&buf, "my-api", "feature/auth", tasks, runs, lastRun)
+	Render(&buf, "my-api", "feature/auth", tasks, runs, lastRun, testTheme)
 	out := buf.String()
 
 	for _, want := range []string{
-		"Project: my-api",
-		"Branch:  feature/auth",
-		"Tasks:  2/4 complete (50%)",
+		"my-api",
+		"feature/auth",
+		"2/4 complete (50%)",
 		"Dependencies and project config",
 		"Database layer",
 		"Delete todo endpoint",
 		"List filtering and search",
-		"Last run:   2026-02-11 14:30 (build, 5 iterations)",
-		"Total cost: $3.4567 across 2 iterations",
+		"2026-02-11 14:30",
+		"build",
+		"5 iterations",
+		"$3.4567",
+		"2 iterations",
 	} {
 		assert.Contains(t, out, want)
 	}
@@ -176,10 +182,10 @@ func TestRender(t *testing.T) {
 
 func TestRenderEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	Render(&buf, "my-api", "main", nil, nil, nil)
+	Render(&buf, "my-api", "main", nil, nil, nil, testTheme)
 	out := buf.String()
 
-	assert.Contains(t, out, "Project: my-api")
-	assert.NotContains(t, out, "Tasks:")
-	assert.NotContains(t, out, "Last run:")
+	assert.Contains(t, out, "my-api")
+	assert.NotContains(t, out, "Tasks")
+	assert.NotContains(t, out, "Last run")
 }

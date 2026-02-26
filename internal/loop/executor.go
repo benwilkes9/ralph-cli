@@ -6,6 +6,7 @@ import (
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
 	"github.com/benwilkes9/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // GitClient abstracts git operations used by the loop.
@@ -34,8 +35,10 @@ func (r *realGitClient) PushSetUpstream(branch string) error {
 	return git.PushSetUpstream(branch) //nolint:wrapcheck // thin adapter
 }
 
-type realClaudeRunner struct{}
+type realClaudeRunner struct {
+	theme *ui.Theme
+}
 
 func (r *realClaudeRunner) Run(ctx context.Context, opts *Options, logW, displayW io.Writer) (*stream.IterationStats, error) {
-	return runClaude(ctx, opts, logW, displayW)
+	return runClaude(ctx, opts, logW, displayW, r.theme)
 }

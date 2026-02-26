@@ -13,6 +13,7 @@ import (
 	"github.com/benwilkes9/ralph-cli/internal/state"
 	"github.com/benwilkes9/ralph-cli/internal/stream"
 	"github.com/benwilkes9/ralph-cli/internal/summary"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // Mode represents the loop mode (plan or build).
@@ -38,12 +39,12 @@ type Options struct {
 }
 
 // Run executes the main iteration loop.
-func Run(ctx context.Context, opts *Options, w io.Writer) error {
-	return run(ctx, opts, w, &realGitClient{}, &realClaudeRunner{})
+func Run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme) error {
+	return run(ctx, opts, w, theme, &realGitClient{}, &realClaudeRunner{theme: theme})
 }
 
-func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claudeCl ClaudeRunner) error {
-	RenderHeader(w, opts)
+func run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme, gitCl GitClient, claudeCl ClaudeRunner) error {
+	RenderHeader(w, opts, theme)
 
 	// Seed stale detector with initial HEAD.
 	head, err := gitCl.Head()
@@ -63,7 +64,7 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 	)
 	for i := 1; ; i++ {
 		if opts.MaxIterations > 0 && i > opts.MaxIterations {
-			RenderMaxIterations(w, opts.MaxIterations)
+			RenderMaxIterations(w, opts.MaxIterations, theme)
 			break
 		}
 
@@ -77,7 +78,7 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 			return fmt.Errorf("getting HEAD before iteration: %w", err)
 		}
 
-		RenderBanner(w, opts.Mode, i)
+		RenderBanner(w, opts.Mode, i, theme)
 
 		logW, err := logfile.New(opts.LogsDir)
 		if err != nil {
@@ -94,7 +95,7 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 
 		if iterStats != nil {
 			cumStats.Update(iterStats)
-			RenderIterationSummary(w, iterStats, logW.Path())
+			RenderIterationSummary(w, iterStats, logW.Path(), theme)
 		}
 
 		// Check for stale iterations.
@@ -105,9 +106,9 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 
 		if headBefore == headAfter {
 			abort, count := stale.Check(headAfter)
-			RenderStaleWarning(w, count, stale.MaxStale())
+			RenderStaleWarning(w, count, stale.MaxStale(), theme)
 			if abort {
-				RenderStaleAbort(w, stale.MaxStale())
+				RenderStaleAbort(w, stale.MaxStale(), theme)
 				staleAborted = true
 				break
 			}
@@ -116,15 +117,15 @@ func run(ctx context.Context, opts *Options, w io.Writer, gitCl GitClient, claud
 
 			// Push with fallback to --set-upstream.
 			if pushErr := gitCl.Push(opts.Branch); pushErr != nil {
-				RenderPushFallback(w)
+				RenderPushFallback(w, theme)
 				if upErr := gitCl.PushSetUpstream(opts.Branch); upErr != nil {
-					fmt.Fprintf(w, "%sPush failed: %s%s\n", stream.Dim, upErr, stream.Reset) //nolint:errcheck // display-only
+					fmt.Fprintf(w, "%s\n", theme.Muted.Render(fmt.Sprintf("Push failed: %s", upErr))) //nolint:errcheck // display-only
 				}
 			}
 		}
 	}
 
-	summary.PrintBox(w, cumStats, time.Since(startTime))
+	summary.PrintBox(w, cumStats, time.Since(startTime), theme)
 	saveState(opts, cumStats, startTime, logPaths, cancelled, staleAborted)
 
 	if staleAborted {
@@ -184,7 +185,7 @@ func claudeArgs() []string {
 }
 
 // runClaude invokes the claude CLI, tees output to the log writer, and returns iteration stats.
-func runClaude(ctx context.Context, opts *Options, logW, displayW io.Writer) (*stream.IterationStats, error) {
+func runClaude(ctx context.Context, opts *Options, logW, displayW io.Writer, theme *ui.Theme) (*stream.IterationStats, error) {
 	args := claudeArgs()
 
 	cmd := exec.CommandContext(ctx, "claude", args...) //nolint:gosec // args are static
@@ -214,7 +215,7 @@ func runClaude(ctx context.Context, opts *Options, logW, displayW io.Writer) (*s
 	}
 
 	tee := io.TeeReader(stdout, logW)
-	stats, processErr := stream.Process(tee, displayW)
+	stats, processErr := stream.Process(tee, displayW, theme)
 
 	waitErr := cmd.Wait()
 

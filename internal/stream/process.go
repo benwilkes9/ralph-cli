@@ -3,13 +3,15 @@ package stream
 import (
 	"errors"
 	"io"
+
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // Process reads a JSONL stream, formats events to w, and returns iteration stats.
 // The per-iteration summary line is NOT rendered here — that's the caller's job.
-func Process(r io.Reader, w io.Writer) (*IterationStats, error) {
+func Process(r io.Reader, w io.Writer, theme *ui.Theme) (*IterationStats, error) {
 	parser := NewParser(r)
-	formatter := NewFormatter(w)
+	formatter := NewFormatter(w, theme)
 	stats := &IterationStats{}
 
 	for {

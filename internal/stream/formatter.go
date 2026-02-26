@@ -6,6 +6,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // Event type constants.
@@ -14,25 +16,6 @@ const (
 	eventUser      = "user"
 	eventResult    = "result"
 	contentToolUse = "tool_use"
-)
-
-// ANSI escape codes
-const (
-	Reset      = "\033[0m"
-	Bold       = "\033[1m"
-	Dim        = "\033[2m"
-	White      = "\033[37m"
-	Green      = "\033[32m"
-	Red        = "\033[31m"
-	Yellow     = "\033[33m"
-	Cyan       = "\033[36m"
-	Magenta    = "\033[35m"
-	BoldCyan   = "\033[1;36m"
-	BoldRed    = "\033[1;31m"
-	BoldWhite  = "\033[1;37m"
-	BoldGreen  = "\033[1;32m"
-	BoldYellow = "\033[1;33m"
-	BoldBlue   = "\033[1;34m"
 )
 
 // FormatTokens formats a token count for display (e.g. "45.3k", "1.5M").
@@ -57,12 +40,13 @@ var paramPriority = []string{
 
 // Formatter writes formatted stream events to an io.Writer.
 type Formatter struct {
-	w io.Writer
+	w     io.Writer
+	theme *ui.Theme
 }
 
-// NewFormatter creates a Formatter that writes to w.
-func NewFormatter(w io.Writer) *Formatter {
-	return &Formatter{w: w}
+// NewFormatter creates a Formatter that writes to w using the given theme.
+func NewFormatter(w io.Writer, theme *ui.Theme) *Formatter {
+	return &Formatter{w: w, theme: theme}
 }
 
 // Format writes a human-readable representation of an event.
@@ -84,7 +68,7 @@ func (f *Formatter) formatAssistant(evt *Event) error {
 	for _, block := range evt.Message.Content {
 		switch block.Type {
 		case "text":
-			if _, err := fmt.Fprintf(f.w, "%s%s%s%s\n", Bold, White, block.Text, Reset); err != nil {
+			if _, err := fmt.Fprintln(f.w, f.theme.Body.Render(block.Text)); err != nil {
 				return fmt.Errorf("writing text block: %w", err)
 			}
 		case contentToolUse:
@@ -101,7 +85,8 @@ func (f *Formatter) formatToolUse(block *ContentBlock) error {
 		return f.formatTaskToolUse(block)
 	}
 	param := extractParam(block.Input)
-	if _, err := fmt.Fprintf(f.w, "  %s· %s %s%s\n", Dim, block.Name, param, Reset); err != nil {
+	line := fmt.Sprintf("  %s", f.theme.Muted.Render(fmt.Sprintf("· %s %s", block.Name, param)))
+	if _, err := fmt.Fprintln(f.w, line); err != nil {
 		return fmt.Errorf("writing tool use: %w", err)
 	}
 	return nil
@@ -126,15 +111,15 @@ func (f *Formatter) formatTaskToolUse(block *ContentBlock) error {
 		description = "\u2014"
 	}
 
-	line := fmt.Sprintf("  %s▶ %s%s  %s%q%s", BoldCyan, subagentType, Reset, White, description, Reset)
+	line := fmt.Sprintf("  %s  %q", f.theme.SubagentTag.Render("▶ "+subagentType), description)
 
 	if model := jsonString(input["model"]); model != "" {
-		line += fmt.Sprintf("  %smodel=%s%s", Dim, model, Reset)
+		line += "  " + f.theme.Muted.Render("model="+model)
 	}
 	if raw, ok := input["max_turns"]; ok {
 		var n json.Number
 		if json.Unmarshal(raw, &n) == nil {
-			line += fmt.Sprintf("  %smax_turns=%s%s", Dim, n.String(), Reset)
+			line += "  " + f.theme.Muted.Render("max_turns="+n.String())
 		}
 	}
 
@@ -154,8 +139,10 @@ func (f *Formatter) formatUser(evt *Event) error {
 		duration := fmt.Sprintf("%.0f", float64(tr.TotalDurationMs)/1000)
 		tools := fmt.Sprintf("%d", tr.TotalToolUseCount)
 		tokens := FormatTokens(tr.TotalTokens)
-		if _, err := fmt.Fprintf(f.w, "    %s✓ %s%s%ss, %s tool calls, %s tokens%s\n",
-			Green, Reset, Dim, duration, tools, tokens, Reset); err != nil {
+		line := fmt.Sprintf("    %s %s",
+			f.theme.Success.Render("✓"),
+			f.theme.Muted.Render(fmt.Sprintf("%ss, %s tool calls, %s tokens", duration, tools, tokens)))
+		if _, err := fmt.Fprintln(f.w, line); err != nil {
 			return fmt.Errorf("writing tool result: %w", err)
 		}
 	} else {
@@ -163,7 +150,7 @@ func (f *Formatter) formatUser(evt *Event) error {
 		if status == "" {
 			status = "unknown"
 		}
-		if _, err := fmt.Fprintf(f.w, "    %s✗ %s%s\n", BoldRed, status, Reset); err != nil {
+		if _, err := fmt.Fprintln(f.w, "    "+f.theme.Error.Render("✗ "+status)); err != nil {
 			return fmt.Errorf("writing tool error: %w", err)
 		}
 	}

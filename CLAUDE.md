@@ -10,7 +10,7 @@ Ralph CLI — a Go CLI that orchestrates autonomous plan/build iteration loops u
 ralph init           # Scaffold .ralph/ in current repo (must be on a feature branch)
 ralph init --force   # Overwrite existing scaffold files (useful after upgrading ralph)
 ralph plan    # Run planning loop (generates implementation plan from specs)
-ralph apply   # Run build loop (implements tasks from the plan one at a time)
+ralph build   # Run build loop (implements tasks from the plan one at a time)
 ralph status  # Progress summary — tasks done, costs, pass/fail
 ```
 
@@ -129,7 +129,7 @@ equivalent of REST API tests that mock the database and call the real HTTP handl
 3. Call `cmd.Execute()` and assert on filesystem side-effects and `fake.calls`
 
 **Key seams:**
-- `Orchestrator` interface — injected into `planCmd`/`applyCmd`; production uses `realOrchestrator{}`
+- `Orchestrator` interface — injected into `planCmd`/`buildCmd`; production uses `realOrchestrator{}`
 - `cmd.InOrStdin()` / `cmd.OutOrStdout()` — used in `initCmd`/`statusCmd`; tests redirect with `cmd.SetIn`/`cmd.SetOut`
 - Git subprocesses — use real `git` CLI in a temp repo; do **not** mock git at this layer
 - Do **not** use `t.Parallel()` in `cmd/ralph` tests — `os.Chdir` is process-global

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/benwilkes9/ralph-cli/internal/testutil"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // NOTE: No t.Parallel() in this file — os.Chdir is process-global.
@@ -29,7 +30,7 @@ type fakeCall struct {
 	maxIter                          int
 }
 
-func (f *fakeOrchestrator) BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error {
+func (f *fakeOrchestrator) BuildAndRun(_ io.Writer, _ *ui.Theme, mode string, maxIter int, branch, planFile, specsDir string) error {
 	f.calls = append(f.calls, fakeCall{mode, branch, planFile, specsDir, maxIter})
 	return f.err
 }
@@ -297,14 +298,14 @@ func TestPlanCmd_ProtectedBranch(t *testing.T) {
 	assert.Empty(t, fake.calls)
 }
 
-// --- applyCmd ---
+// --- buildCmd ---
 
-func TestApplyCmd_MissingPlanFile(t *testing.T) {
+func TestBuildCmd_MissingPlanFile(t *testing.T) {
 	dir := initRepoWithConfig(t)
 	testutil.Chdir(t, dir)
 
 	fake := &fakeOrchestrator{}
-	cmd := applyCmd(fake)
+	cmd := buildCmd(fake)
 
 	err := cmd.Execute()
 	require.Error(t, err)
@@ -312,7 +313,7 @@ func TestApplyCmd_MissingPlanFile(t *testing.T) {
 	assert.Empty(t, fake.calls)
 }
 
-func TestApplyCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
+func TestBuildCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
 	dir := initRepoWithConfig(t)
 	testutil.Chdir(t, dir)
 
@@ -321,7 +322,7 @@ func TestApplyCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
 	require.NoError(t, os.WriteFile(planPath, []byte("# Plan\n"), 0o600))
 
 	fake := &fakeOrchestrator{}
-	cmd := applyCmd(fake)
+	cmd := buildCmd(fake)
 
 	require.NoError(t, cmd.Execute())
 
