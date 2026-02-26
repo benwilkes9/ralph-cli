@@ -148,10 +148,7 @@ func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo, l
 				done++
 			}
 		}
-		pct := 0
-		if len(tasks) > 0 {
-			pct = done * 100 / len(tasks)
-		}
+		pct := done * 100 / len(tasks)
 		fmt.Fprintf(w, "\n Tasks  %d/%d complete (%d%%)\n", done, len(tasks), pct)
 
 		// Progress bar

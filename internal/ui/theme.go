@@ -100,6 +100,7 @@ func (t *Theme) FormatError(msg string) string {
 }
 
 // ModeStyle returns the appropriate style for the given loop mode string.
+// "plan" matches loop.ModePlan; all other values (including "build") use BuildMode.
 func (t *Theme) ModeStyle(mode string) lipgloss.Style {
 	if mode == "plan" {
 		return t.PlanMode
@@ -108,6 +109,7 @@ func (t *Theme) ModeStyle(mode string) lipgloss.Style {
 }
 
 // IterationStyle returns the iteration box border style for the given mode.
+// "plan" matches loop.ModePlan; all other values (including "build") use IterationBd.
 func (t *Theme) IterationStyle(mode string) lipgloss.Style {
 	if mode == "plan" {
 		return t.IterationPl

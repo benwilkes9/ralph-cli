@@ -23,11 +23,10 @@ func TestDefaultTheme(t *testing.T) {
 func TestModeStyle(t *testing.T) {
 	theme := DefaultTheme()
 
-	plan := theme.ModeStyle("plan")
-	build := theme.ModeStyle("build")
-
-	assert.Equal(t, theme.PlanMode, plan)
-	assert.Equal(t, theme.BuildMode, build)
+	assert.Equal(t, theme.PlanMode, theme.ModeStyle("plan"))
+	assert.Equal(t, theme.BuildMode, theme.ModeStyle("build"))
+	assert.Equal(t, theme.BuildMode, theme.ModeStyle("unknown"), "unknown modes fall back to BuildMode")
+	assert.Equal(t, theme.BuildMode, theme.ModeStyle(""), "empty mode falls back to BuildMode")
 }
 
 func TestIterationStyle(t *testing.T) {
@@ -35,6 +34,7 @@ func TestIterationStyle(t *testing.T) {
 
 	assert.Equal(t, theme.IterationPl, theme.IterationStyle("plan"))
 	assert.Equal(t, theme.IterationBd, theme.IterationStyle("build"))
+	assert.Equal(t, theme.IterationBd, theme.IterationStyle("unknown"), "unknown modes fall back to IterationBd")
 }
 
 func TestBanner(t *testing.T) {
