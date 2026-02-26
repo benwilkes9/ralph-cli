@@ -8,6 +8,7 @@ import (
 
 	"github.com/benwilkes9/ralph-cli/internal/config"
 	"github.com/benwilkes9/ralph-cli/internal/preflight"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // requiredEnvVars lists env vars required beyond auth credentials
@@ -100,13 +101,16 @@ func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir stri
 
 	allowedDomains := AllowedDomains(cfg.Network.ExtraAllowedDomains)
 
-	fmt.Printf("Repo: %s  Branch: %s\n", repo, branch)
-	fmt.Printf("Mount: %s → /workspace/repo\n", repoRoot)
+	theme := ui.DefaultTheme()
+	fmt.Printf("%s %s  %s %s\n",
+		theme.Muted.Render("Repo:"), repo,
+		theme.Muted.Render("Branch:"), theme.Info.Render(branch))
+	fmt.Printf("%s %s → /workspace/repo\n", theme.Muted.Render("Mount:"), repoRoot)
 	if cfg.Docker.DepsDir != "" {
-		fmt.Printf("Deps volume: ralph-deps-%s → %s\n", cfg.Project, cfg.Docker.DepsDir)
+		fmt.Printf("%s ralph-deps-%s → %s\n", theme.Muted.Render("Deps volume:"), cfg.Project, cfg.Docker.DepsDir)
 	}
-	fmt.Printf("Network allowlist: %s\n", strings.Join(allowedDomains, ", "))
-	fmt.Println("Workspace is shared — changes appear on the host in real time.")
+	fmt.Printf("%s %s\n", theme.Muted.Render("Network allowlist:"), strings.Join(allowedDomains, ", "))
+	fmt.Println(theme.Muted.Render("Workspace is shared — changes appear on the host in real time."))
 
 	runOpts := &RunOptions{
 		ImageTag:       DefaultTag,

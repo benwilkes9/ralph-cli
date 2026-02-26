@@ -14,6 +14,7 @@ import (
 
 	"github.com/benwilkes9/ralph-cli/internal/state"
 	"github.com/benwilkes9/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // Task represents a single task parsed from the implementation plan.
@@ -129,12 +130,16 @@ func extractCost(path string) (float64, error) {
 	return 0, nil
 }
 
-// Render writes a formatted status summary to w.
+// Render writes a formatted status summary to w with themed styling.
 //
 //nolint:errcheck // display output, best-effort writes
-func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo, lastRun *state.RunRecord) {
-	fmt.Fprintf(w, "Project: %s\n", project)
-	fmt.Fprintf(w, "Branch:  %s\n", branch)
+func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo, lastRun *state.RunRecord, theme *ui.Theme) {
+	fmt.Fprintln(w, theme.Banner())
+	fmt.Fprintln(w)
+
+	// Project/branch header box
+	header := fmt.Sprintf("%s  ·  %s", project, branch)
+	fmt.Fprintln(w, theme.StatusBox.Render(header))
 
 	if len(tasks) > 0 {
 		done := 0
@@ -147,22 +152,33 @@ func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo, l
 		if len(tasks) > 0 {
 			pct = done * 100 / len(tasks)
 		}
-		fmt.Fprintf(w, "\nTasks:  %d/%d complete (%d%%)\n", done, len(tasks), pct)
+		fmt.Fprintf(w, "\n Tasks  %d/%d complete (%d%%)\n", done, len(tasks), pct)
+
+		// Progress bar
+		barWidth := 40
+		filled := barWidth * pct / 100
+		bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+		fmt.Fprintf(w, " %s  %d%%\n\n", theme.Success.Render(bar), pct)
+
 		for _, t := range tasks {
 			if t.Done {
-				fmt.Fprintf(w, "  %s\u2713%s %s\n", stream.Green, stream.Reset, t.Title)
+				fmt.Fprintf(w, "  %s %s\n", theme.Success.Render("✓"), t.Title)
 			} else {
-				fmt.Fprintf(w, "  %s\u00b7%s %s\n", stream.Dim, stream.Reset, t.Title)
+				fmt.Fprintf(w, "  %s %s\n", theme.Muted.Render("·"), t.Title)
 			}
 		}
 	}
 
+	// Run info box
+	var infoLines []string
 	if lastRun != nil {
-		fmt.Fprintf(w, "\nLast run:   %s (%s, %d iterations)\n",
-			lastRun.StartedAt.Format("2006-01-02 15:04"), lastRun.Mode, lastRun.Iterations)
+		infoLines = append(infoLines,
+			fmt.Sprintf("Last run   %s (%s, %d iterations)",
+				lastRun.StartedAt.Format("2006-01-02 15:04"), lastRun.Mode, lastRun.Iterations))
 	} else if len(runs) > 0 {
 		last := runs[len(runs)-1]
-		fmt.Fprintf(w, "\nLast run:   %s\n", last.Time.Format("2006-01-02 15:04"))
+		infoLines = append(infoLines,
+			fmt.Sprintf("Last run   %s", last.Time.Format("2006-01-02 15:04")))
 	}
 
 	if len(runs) > 0 {
@@ -170,6 +186,14 @@ func Render(w io.Writer, project, branch string, tasks []Task, runs []RunInfo, l
 		for _, r := range runs {
 			totalCost += r.Cost
 		}
-		fmt.Fprintf(w, "Total cost: $%.4f across %d iterations\n", totalCost, len(runs))
+		infoLines = append(infoLines,
+			fmt.Sprintf("Total cost %s across %d iterations",
+				theme.Cost.Render(fmt.Sprintf("$%.4f", totalCost)), len(runs)))
+	}
+
+	if len(infoLines) > 0 {
+		fmt.Fprintln(w)
+		content := strings.Join(infoLines, "\n")
+		fmt.Fprintln(w, theme.SummaryBox.Render(content))
 	}
 }

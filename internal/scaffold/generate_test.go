@@ -9,7 +9,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
+
+var testTheme = ui.DefaultTheme()
 
 func TestGenerate_CreatesAllFiles(t *testing.T) {
 	dir := t.TempDir()
@@ -231,11 +235,13 @@ func TestPrintSummary_WithBranch(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	PrintSummary(&buf, result)
+	PrintSummary(&buf, result, testTheme)
 
 	output := buf.String()
-	assert.Contains(t, output, "created  .ralph/config.yaml")
-	assert.Contains(t, output, "exists   .env.example")
+	assert.Contains(t, output, "created")
+	assert.Contains(t, output, ".ralph/config.yaml")
+	assert.Contains(t, output, "exists")
+	assert.Contains(t, output, ".env.example")
 	assert.Contains(t, output, "Next steps")
 	assert.Contains(t, output, "specs/my-feature/")
 }
@@ -247,7 +253,7 @@ func TestPrintSummary_NoBranch(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	PrintSummary(&buf, result)
+	PrintSummary(&buf, result, testTheme)
 
 	output := buf.String()
 	assert.Contains(t, output, "specs/")
@@ -260,7 +266,7 @@ func TestPrintSummary_CustomSpecsDir(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	PrintSummary(&buf, result)
+	PrintSummary(&buf, result, testTheme)
 
 	output := buf.String()
 	assert.Contains(t, output, "docs/requirements/feat-x/")
@@ -415,10 +421,13 @@ func TestPrintSummary_WithOverwritten(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	PrintSummary(&buf, result)
+	PrintSummary(&buf, result, testTheme)
 
 	output := buf.String()
-	assert.Contains(t, output, "created  .ralph/config.yaml")
-	assert.Contains(t, output, "updated  .ralph/prompts/plan.md")
-	assert.Contains(t, output, "exists   .env.example")
+	assert.Contains(t, output, "created")
+	assert.Contains(t, output, ".ralph/config.yaml")
+	assert.Contains(t, output, "updated")
+	assert.Contains(t, output, ".ralph/prompts/plan.md")
+	assert.Contains(t, output, "exists")
+	assert.Contains(t, output, ".env.example")
 }

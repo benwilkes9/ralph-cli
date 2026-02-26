@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/benwilkes9/ralph-cli/internal/git"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 //go:embed all:templates
@@ -215,26 +216,27 @@ func containsLine(content, line string) bool {
 	return false
 }
 
-// PrintSummary displays which files were created and skipped.
-func PrintSummary(w io.Writer, result *GenerateResult) {
-	printLine(w, "")
+// PrintSummary displays which files were created and skipped with themed styling.
+//
+//nolint:errcheck // display-only writes
+func PrintSummary(w io.Writer, result *GenerateResult, theme *ui.Theme) {
+	fmt.Fprintln(w)
 	for _, f := range result.Created {
-		printLine(w, "  created  "+f)
+		fmt.Fprintf(w, "  %s  %s\n", theme.FileCreated.Render("✓ created"), f)
 	}
 	for _, f := range result.Overwritten {
-		printLine(w, "  updated  "+f)
+		fmt.Fprintf(w, "  %s  %s\n", theme.FileUpdated.Render("✓ updated"), f)
 	}
 	for _, f := range result.Skipped {
-		printLine(w, "  exists   "+f)
+		fmt.Fprintf(w, "  %s  %s\n", theme.FileSkipped.Render("○ exists"), f)
 	}
-	printLine(w, "")
-	printLine(w, "Next steps:")
-	printLine(w, "  1. Edit .env with your credentials — see .env.example for reference")
-	printLine(w, "  2. Review .ralph/config.yaml and .ralph/prompts/")
-	printLine(w, fmt.Sprintf("  3. Add your specs to %s/", result.SpecsDir))
-	printLine(w, "  4. Run: ralph plan (scaffold files will be auto-committed)")
-}
 
-func printLine(w io.Writer, s string) {
-	fmt.Fprintln(w, s) //nolint:errcheck // display-only
+	nextSteps := fmt.Sprintf("Next steps\n\n"+
+		"  1. Edit .env with your credentials — see .env.example for reference\n"+
+		"  2. Review .ralph/config.yaml and .ralph/prompts/\n"+
+		"  3. Add your specs to %s/\n"+
+		"  4. Run: ralph plan (scaffold files will be auto-committed)", result.SpecsDir)
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, theme.NextSteps.Render(nextSteps))
 }

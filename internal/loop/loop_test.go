@@ -7,7 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/benwilkes9/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
+
+var testTheme = ui.DefaultTheme()
 
 func TestRenderHeader(t *testing.T) {
 	var buf bytes.Buffer
@@ -17,7 +20,7 @@ func TestRenderHeader(t *testing.T) {
 		Branch:        "feat/awesome",
 		MaxIterations: 10,
 	}
-	RenderHeader(&buf, &opts)
+	RenderHeader(&buf, &opts, testTheme)
 	out := buf.String()
 
 	for _, want := range []string{"━━━", "build", ".ralph/prompts/build.md", "feat/awesome", "10 iterations"} {
@@ -33,27 +36,27 @@ func TestRenderHeaderNoMax(t *testing.T) {
 		Branch:        "main",
 		MaxIterations: 0,
 	}
-	RenderHeader(&buf, &opts)
+	RenderHeader(&buf, &opts, testTheme)
 	assert.NotContains(t, buf.String(), "iterations")
 }
 
-func TestRenderHeaderPlanColor(t *testing.T) {
+func TestRenderHeaderPlanMode(t *testing.T) {
 	var buf bytes.Buffer
 	opts := Options{Mode: ModePlan, PromptFile: "p.md", Branch: "main"}
-	RenderHeader(&buf, &opts)
-	assert.Contains(t, buf.String(), stream.BoldCyan)
+	RenderHeader(&buf, &opts, testTheme)
+	assert.Contains(t, buf.String(), "plan")
 }
 
-func TestRenderHeaderBuildColor(t *testing.T) {
+func TestRenderHeaderBuildMode(t *testing.T) {
 	var buf bytes.Buffer
 	opts := Options{Mode: ModeBuild, PromptFile: "b.md", Branch: "main"}
-	RenderHeader(&buf, &opts)
-	assert.Contains(t, buf.String(), stream.BoldGreen)
+	RenderHeader(&buf, &opts, testTheme)
+	assert.Contains(t, buf.String(), "build")
 }
 
 func TestRenderBanner(t *testing.T) {
 	var buf bytes.Buffer
-	RenderBanner(&buf, ModeBuild, 1)
+	RenderBanner(&buf, ModeBuild, 1, testTheme)
 	out := buf.String()
 
 	for _, want := range []string{"BUILD", "#1", "╔", "╚"} {
@@ -63,11 +66,10 @@ func TestRenderBanner(t *testing.T) {
 
 func TestRenderBannerPlan(t *testing.T) {
 	var buf bytes.Buffer
-	RenderBanner(&buf, ModePlan, 3)
+	RenderBanner(&buf, ModePlan, 3, testTheme)
 	out := buf.String()
 
 	assert.Contains(t, out, "PLAN")
-	assert.Contains(t, out, stream.BoldCyan)
 }
 
 func TestRenderIterationSummary(t *testing.T) {
@@ -76,7 +78,7 @@ func TestRenderIterationSummary(t *testing.T) {
 		PeakContext: 85_200,
 		Cost:        0.0234,
 	}
-	RenderIterationSummary(&buf, stats, "logs/20250101-120000.jsonl")
+	RenderIterationSummary(&buf, stats, "logs/20250101-120000.jsonl", testTheme)
 	out := buf.String()
 
 	for _, want := range []string{"85.2k", "200.0k", "42%", "$0.0234", "logs/20250101-120000.jsonl"} {
@@ -90,41 +92,33 @@ func TestRenderIterationSummaryZeroCost(t *testing.T) {
 		PeakContext: 10_000,
 		Cost:        0,
 	}
-	RenderIterationSummary(&buf, stats, "logs/test.jsonl")
+	RenderIterationSummary(&buf, stats, "logs/test.jsonl", testTheme)
 	assert.NotContains(t, buf.String(), "$")
 }
 
 func TestRenderStaleWarning(t *testing.T) {
 	var buf bytes.Buffer
-	RenderStaleWarning(&buf, 1, 2)
+	RenderStaleWarning(&buf, 1, 2, testTheme)
 	out := buf.String()
 
 	assert.Contains(t, out, "No new commits")
 	assert.Contains(t, out, "1/2")
-	assert.Contains(t, out, stream.BoldYellow)
 }
 
 func TestRenderStaleAbort(t *testing.T) {
 	var buf bytes.Buffer
-	RenderStaleAbort(&buf, 2)
+	RenderStaleAbort(&buf, 2, testTheme)
 	out := buf.String()
 
 	assert.Contains(t, out, "Stale loop detected")
-	assert.Contains(t, out, stream.BoldRed)
 }
 
 func TestRenderMaxIterations(t *testing.T) {
 	var buf bytes.Buffer
-	RenderMaxIterations(&buf, 5)
+	RenderMaxIterations(&buf, 5, testTheme)
 	out := buf.String()
 
 	assert.Contains(t, out, "Reached max iterations: 5")
-	assert.Contains(t, out, stream.BoldYellow)
-}
-
-func TestModeColor(t *testing.T) {
-	assert.Equal(t, stream.BoldCyan, modeColor(ModePlan))
-	assert.Equal(t, stream.BoldGreen, modeColor(ModeBuild))
 }
 
 func TestStaleDetectorIntegration(t *testing.T) {

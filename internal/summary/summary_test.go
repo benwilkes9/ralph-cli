@@ -8,11 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/benwilkes9/ralph-cli/internal/stream"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
+
+var testTheme = ui.DefaultTheme()
 
 func printBox(stats *stream.CumulativeStats, wallTime time.Duration) string {
 	var buf bytes.Buffer
-	PrintBox(&buf, stats, wallTime)
+	PrintBox(&buf, stats, wallTime, testTheme)
 	return buf.String()
 }
 
@@ -20,11 +23,12 @@ func TestPrintBox_Header(t *testing.T) {
 	out := printBox(&stream.CumulativeStats{}, 0)
 
 	assert.Contains(t, out, "JOB SUMMARY")
-	assert.Contains(t, out, "┌")
-	assert.Contains(t, out, "┐")
+	// Lip Gloss renders rounded border characters
+	assert.Contains(t, out, "╭")
+	assert.Contains(t, out, "╮")
 	assert.Contains(t, out, "│")
-	assert.Contains(t, out, "└")
-	assert.Contains(t, out, "┘")
+	assert.Contains(t, out, "╰")
+	assert.Contains(t, out, "╯")
 }
 
 func TestPrintBox_Iterations(t *testing.T) {

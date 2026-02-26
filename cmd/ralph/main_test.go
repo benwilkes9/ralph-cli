@@ -297,14 +297,14 @@ func TestPlanCmd_ProtectedBranch(t *testing.T) {
 	assert.Empty(t, fake.calls)
 }
 
-// --- applyCmd ---
+// --- buildCmd ---
 
-func TestApplyCmd_MissingPlanFile(t *testing.T) {
+func TestBuildCmd_MissingPlanFile(t *testing.T) {
 	dir := initRepoWithConfig(t)
 	testutil.Chdir(t, dir)
 
 	fake := &fakeOrchestrator{}
-	cmd := applyCmd(fake)
+	cmd := buildCmd(fake)
 
 	err := cmd.Execute()
 	require.Error(t, err)
@@ -312,7 +312,7 @@ func TestApplyCmd_MissingPlanFile(t *testing.T) {
 	assert.Empty(t, fake.calls)
 }
 
-func TestApplyCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
+func TestBuildCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
 	dir := initRepoWithConfig(t)
 	testutil.Chdir(t, dir)
 
@@ -321,7 +321,7 @@ func TestApplyCmd_CallsOrchestratorWithBuildMode(t *testing.T) {
 	require.NoError(t, os.WriteFile(planPath, []byte("# Plan\n"), 0o600))
 
 	fake := &fakeOrchestrator{}
-	cmd := applyCmd(fake)
+	cmd := buildCmd(fake)
 
 	require.NoError(t, cmd.Execute())
 

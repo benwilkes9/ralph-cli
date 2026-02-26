@@ -18,6 +18,7 @@ import (
 	"github.com/benwilkes9/ralph-cli/internal/scaffold"
 	"github.com/benwilkes9/ralph-cli/internal/state"
 	"github.com/benwilkes9/ralph-cli/internal/status"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 var version = "dev"
@@ -34,12 +35,12 @@ func main() {
 	orch := realOrchestrator{}
 	root.AddCommand(initCmd())
 	root.AddCommand(planCmd(orch))
-	root.AddCommand(applyCmd(orch))
+	root.AddCommand(buildCmd(orch))
 	root.AddCommand(statusCmd())
 	root.AddCommand(loopCmd())
 
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, ui.DefaultTheme().FormatError(err.Error()))
 		os.Exit(1)
 	}
 }
@@ -49,6 +50,8 @@ func initCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Scaffold .ralph/ in current repo",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			theme := ui.DefaultTheme()
+
 			force, err := cmd.Flags().GetBool("force")
 			if err != nil {
 				return fmt.Errorf("reading --force flag: %w", err)
@@ -67,12 +70,16 @@ func initCmd() *cobra.Command {
 				return fmt.Errorf("ralph init must be run on a feature branch, not %q — create one first: git checkout -b my-feature", branch)
 			}
 
+			w := cmd.OutOrStdout()
+			fmt.Fprintln(w, theme.Banner()) //nolint:errcheck // display-only
+			fmt.Fprintln(w)                 //nolint:errcheck // display-only
+
 			info := scaffold.Detect(repoRoot)
 
 			_, isTerminal := cmd.InOrStdin().(*os.File)
 			if err := scaffold.RunPrompts(info, &scaffold.PromptOptions{
 				In:         cmd.InOrStdin(),
-				Out:        cmd.OutOrStdout(),
+				Out:        w,
 				Accessible: !isTerminal,
 				Branch:     branch,
 			}); err != nil {
@@ -84,7 +91,7 @@ func initCmd() *cobra.Command {
 				return fmt.Errorf("generating scaffold: %w", err)
 			}
 
-			scaffold.PrintSummary(cmd.OutOrStdout(), result)
+			scaffold.PrintSummary(w, result, theme)
 			return nil
 		},
 	}
@@ -105,7 +112,7 @@ func validateRelativePath(flag, path string) error {
 	return nil
 }
 
-// Orchestrator abstracts the docker plan/build workflow so planCmd and applyCmd
+// Orchestrator abstracts the docker plan/build workflow so planCmd and buildCmd
 // can be tested without a real Docker daemon.
 type Orchestrator interface {
 	BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error
@@ -117,7 +124,7 @@ func (r realOrchestrator) BuildAndRun(mode string, maxIter int, branch, planFile
 	return docker.BuildAndRun(mode, maxIter, branch, planFile, specsDir) //nolint:wrapcheck // thin adapter
 }
 
-// runParams holds resolved parameters shared by planCmd and applyCmd.
+// runParams holds resolved parameters shared by planCmd and buildCmd.
 type runParams struct {
 	maxVal   int
 	branch   string
@@ -180,6 +187,11 @@ func planCmd(orch Orchestrator) *cobra.Command {
 		Use:   "plan",
 		Short: "Run planning loop (generates branch-specific plan)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			theme := ui.DefaultTheme()
+			w := cmd.OutOrStdout()
+			fmt.Fprintln(w, theme.Banner()) //nolint:errcheck // display-only
+			fmt.Fprintln(w)                 //nolint:errcheck // display-only
+
 			p, err := resolveRunParams(cmd)
 			if err != nil {
 				return err
@@ -225,11 +237,16 @@ func planCmd(orch Orchestrator) *cobra.Command {
 	return cmd
 }
 
-func applyCmd(orch Orchestrator) *cobra.Command {
+func buildCmd(orch Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "apply",
+		Use:   "build",
 		Short: "Run build loop (implements tasks one at a time)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			theme := ui.DefaultTheme()
+			w := cmd.OutOrStdout()
+			fmt.Fprintln(w, theme.Banner()) //nolint:errcheck // display-only
+			fmt.Fprintln(w)                 //nolint:errcheck // display-only
+
 			p, err := resolveRunParams(cmd)
 			if err != nil {
 				return err
@@ -285,7 +302,7 @@ func statusCmd() *cobra.Command {
 				return fmt.Errorf("loading state: %w", err)
 			}
 
-			status.Render(cmd.OutOrStdout(), cfg.Project, branch, tasks, runs, st.LastRun())
+			status.Render(cmd.OutOrStdout(), cfg.Project, branch, tasks, runs, st.LastRun(), ui.DefaultTheme())
 			return nil
 		},
 	}
@@ -377,7 +394,7 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 		SpecsDir:      specsDir,
 	}
 
-	loopErr := loop.Run(ctx, opts, os.Stdout)
+	loopErr := loop.Run(ctx, opts, os.Stdout, ui.DefaultTheme())
 	stop()
 
 	if ctx.Err() != nil {

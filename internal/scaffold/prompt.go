@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // PromptOptions configures input/output for interactive prompts.
@@ -63,7 +65,8 @@ func RunPrompts(info *ProjectInfo, opts *PromptOptions) error {
 				Title("Specs directory (used as-is, branch not appended)").
 				Value(&info.SpecsDir),
 		).WithHideFunc(func() bool { return specsChoice != customSentinel }),
-	).WithAccessible(opts.Accessible)
+	).WithAccessible(opts.Accessible).
+		WithTheme(ui.HuhTheme())
 
 	if opts.In != nil {
 		form = form.WithInput(opts.In)

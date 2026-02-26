@@ -2,6 +2,7 @@ package docker
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -55,6 +56,13 @@ func runWithRunner(runner CommandRunner, opts *RunOptions) error {
 		)
 	}
 
+	// If a cross-compiled Linux binary exists alongside the host binary,
+	// mount it into the container to override the registry-installed version.
+	// This lets local (unpublished) changes take effect inside Docker.
+	if linuxBin := findLinuxBinary(); linuxBin != "" {
+		args = append(args, "-v", linuxBin+":/usr/local/bin/ralph:ro")
+	}
+
 	args = append(args,
 		opts.ImageTag,
 		"--",
@@ -78,4 +86,19 @@ func bindMount(hostDir, containerDir string) string {
 
 func depsVolume(projectName string) string {
 	return "ralph-deps-" + projectName
+}
+
+// findLinuxBinary returns the path to a cross-compiled Linux ralph binary
+// if one exists alongside the currently running executable (e.g. ralph-linux
+// next to ralph). Returns "" if not found.
+func findLinuxBinary() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	linuxBin := exe + "-linux"
+	if _, err := os.Stat(linuxBin); err == nil {
+		return linuxBin
+	}
+	return ""
 }
