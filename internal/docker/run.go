@@ -3,12 +3,9 @@ package docker
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 )
-
-const osDarwin = "darwin"
 
 // RunOptions configures a docker run invocation.
 type RunOptions struct {
@@ -77,11 +74,7 @@ func runWithRunner(runner CommandRunner, opts *RunOptions) error {
 }
 
 func bindMount(hostDir, containerDir string) string {
-	m := hostDir + ":" + containerDir
-	if runtime.GOOS == osDarwin {
-		m += ":delegated"
-	}
-	return m
+	return hostDir + ":" + containerDir
 }
 
 func depsVolume(projectName string) string {

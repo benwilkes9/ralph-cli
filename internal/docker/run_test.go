@@ -2,7 +2,6 @@ package docker
 
 import (
 	"errors"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,11 +91,7 @@ func TestRunWithRunner_BindMount(t *testing.T) {
 	require.NoError(t, runWithRunner(r, baseRunOpts()))
 
 	call := r.calls[0]
-	if runtime.GOOS == osDarwin {
-		assert.Contains(t, call, "/home/user/project:/workspace/repo:delegated")
-	} else {
-		assert.Contains(t, call, "/home/user/project:/workspace/repo")
-	}
+	assert.Contains(t, call, "/home/user/project:/workspace/repo")
 }
 
 func TestRunWithRunner_NoLogsVolume(t *testing.T) {

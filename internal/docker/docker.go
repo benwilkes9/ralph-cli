@@ -2,6 +2,7 @@ package docker
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +53,7 @@ func ResolveAuth(env map[string]string) (AuthMethod, error) {
 
 // BuildAndRun orchestrates the full Docker workflow: detect repo, load env,
 // validate, build image, run container with bind mount.
-func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir string) error {
+func BuildAndRun(w io.Writer, theme *ui.Theme, mode string, maxIterations int, branch, planFile, specsDir string) error {
 	repo, err := DetectRepo()
 	if err != nil {
 		return fmt.Errorf("detecting repo: %w", err)
@@ -101,16 +102,17 @@ func BuildAndRun(mode string, maxIterations int, branch, planFile, specsDir stri
 
 	allowedDomains := AllowedDomains(cfg.Network.ExtraAllowedDomains)
 
-	theme := ui.DefaultTheme()
-	fmt.Printf("%s %s  %s %s\n",
+	fmt.Fprintf(w, "%s %s  %s %s\n", //nolint:errcheck // display-only
 		theme.Muted.Render("Repo:"), repo,
 		theme.Muted.Render("Branch:"), theme.Info.Render(branch))
-	fmt.Printf("%s %s → /workspace/repo\n", theme.Muted.Render("Mount:"), repoRoot)
+	fmt.Fprintf(w, "%s %s → /workspace/repo\n", theme.Muted.Render("Mount:"), repoRoot) //nolint:errcheck // display-only
 	if cfg.Docker.DepsDir != "" {
-		fmt.Printf("%s ralph-deps-%s → %s\n", theme.Muted.Render("Deps volume:"), cfg.Project, cfg.Docker.DepsDir)
+		fmt.Fprintf(w, "%s ralph-deps-%s → %s\n", //nolint:errcheck // display-only
+			theme.Muted.Render("Deps volume:"), cfg.Project, cfg.Docker.DepsDir)
 	}
-	fmt.Printf("%s %s\n", theme.Muted.Render("Network allowlist:"), strings.Join(allowedDomains, ", "))
-	fmt.Println(theme.Muted.Render("Workspace is shared — changes appear on the host in real time."))
+	fmt.Fprintf(w, "%s %s\n", //nolint:errcheck // display-only
+		theme.Muted.Render("Network allowlist:"), strings.Join(allowedDomains, ", "))
+	fmt.Fprintln(w, theme.Muted.Render("Workspace is shared — changes appear on the host in real time.")) //nolint:errcheck // display-only
 
 	runOpts := &RunOptions{
 		ImageTag:       DefaultTag,

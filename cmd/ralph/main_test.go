@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/benwilkes9/ralph-cli/internal/testutil"
+	"github.com/benwilkes9/ralph-cli/internal/ui"
 )
 
 // NOTE: No t.Parallel() in this file — os.Chdir is process-global.
@@ -29,7 +30,7 @@ type fakeCall struct {
 	maxIter                          int
 }
 
-func (f *fakeOrchestrator) BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error {
+func (f *fakeOrchestrator) BuildAndRun(_ io.Writer, _ *ui.Theme, mode string, maxIter int, branch, planFile, specsDir string) error {
 	f.calls = append(f.calls, fakeCall{mode, branch, planFile, specsDir, maxIter})
 	return f.err
 }

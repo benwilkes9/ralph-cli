@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -32,6 +33,7 @@ func main() {
 		SilenceErrors: true,
 	}
 
+	theme := ui.DefaultTheme()
 	orch := realOrchestrator{}
 	root.AddCommand(initCmd())
 	root.AddCommand(planCmd(orch))
@@ -40,7 +42,7 @@ func main() {
 	root.AddCommand(loopCmd())
 
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, ui.DefaultTheme().FormatError(err.Error()))
+		fmt.Fprintln(os.Stderr, theme.FormatError(err.Error()))
 		os.Exit(1)
 	}
 }
@@ -115,13 +117,13 @@ func validateRelativePath(flag, path string) error {
 // Orchestrator abstracts the docker plan/build workflow so planCmd and buildCmd
 // can be tested without a real Docker daemon.
 type Orchestrator interface {
-	BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error
+	BuildAndRun(w io.Writer, theme *ui.Theme, mode string, maxIter int, branch, planFile, specsDir string) error
 }
 
 type realOrchestrator struct{}
 
-func (r realOrchestrator) BuildAndRun(mode string, maxIter int, branch, planFile, specsDir string) error {
-	return docker.BuildAndRun(mode, maxIter, branch, planFile, specsDir) //nolint:wrapcheck // thin adapter
+func (r realOrchestrator) BuildAndRun(w io.Writer, theme *ui.Theme, mode string, maxIter int, branch, planFile, specsDir string) error {
+	return docker.BuildAndRun(w, theme, mode, maxIter, branch, planFile, specsDir) //nolint:wrapcheck // thin adapter
 }
 
 // runParams holds resolved parameters shared by planCmd and buildCmd.
@@ -229,7 +231,7 @@ func planCmd(orch Orchestrator) *cobra.Command {
 				return fmt.Errorf("no .md specs found in %s/ — add at least one spec before running plan", p.specsDir)
 			}
 
-			return orch.BuildAndRun("plan", p.maxVal, p.branch, p.planFile, p.specsDir)
+			return orch.BuildAndRun(w, theme, "plan", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
@@ -257,7 +259,7 @@ func buildCmd(orch Orchestrator) *cobra.Command {
 				return fmt.Errorf("plan file %q not found; run \"ralph plan\" first", p.planFile)
 			}
 
-			return orch.BuildAndRun("build", p.maxVal, p.branch, p.planFile, p.specsDir)
+			return orch.BuildAndRun(w, theme, "build", p.maxVal, p.branch, p.planFile, p.specsDir)
 		},
 	}
 	cmd.Flags().IntP("max", "n", 0, "maximum iterations (0 = use config default)")
