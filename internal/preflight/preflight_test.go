@@ -247,6 +247,39 @@ func TestCheck_AutoCommitsModifiedGitignore(t *testing.T) {
 	assert.Contains(t, show, ".gitignore")
 }
 
+func TestCheckAdditionalDirs_EmptyList(t *testing.T) {
+	err := CheckAdditionalDirs("main", nil)
+	require.NoError(t, err)
+}
+
+func TestCheckAdditionalDirs_DirMissing(t *testing.T) {
+	err := CheckAdditionalDirs("main", []string{"/nonexistent/path"})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "does not exist")
+}
+
+func TestCheckAdditionalDirs_NotARepo(t *testing.T) {
+	dir := t.TempDir()
+	err := CheckAdditionalDirs("main", []string{dir})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "not a git repository")
+}
+
+func TestCheckAdditionalDirs_WrongBranch(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	// clone is on "main", but we expect "feature"
+	err := CheckAdditionalDirs("feature", []string{clone})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `on branch "main"`)
+	assert.ErrorContains(t, err, `expected "feature"`)
+}
+
+func TestCheckAdditionalDirs_HappyPath(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	err := CheckAdditionalDirs("main", []string{clone})
+	require.NoError(t, err)
+}
+
 func TestCheck_AllClean(t *testing.T) {
 	_, clone := testutil.InitBareAndClone(t)
 	testutil.Chdir(t, clone)

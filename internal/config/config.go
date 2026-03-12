@@ -9,6 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ErrDuplicateBasename is returned when two additional directories share the same basename.
+var ErrDuplicateBasename = fmt.Errorf("duplicate basename")
+
 // Config holds the ralph project configuration loaded from .ralph/config.yaml.
 type Config struct {
 	Project       string `yaml:"project"`
@@ -16,6 +19,7 @@ type Config struct {
 	SpecsDir      string `yaml:"specs_dir,omitempty"`       // specs directory, e.g. "specs" or "my/custom/path"
 	SpecsDirExact bool   `yaml:"specs_dir_exact,omitempty"` // when true, specs_dir is used as-is (branch not appended)
 
+	AdditionalDirs    []string     `yaml:"additional_directories,omitempty"`
 	ProtectedBranches []string     `yaml:"protected_branches,omitempty"`
 	Backpressure      Backpressure `yaml:"backpressure"`
 	Phases            Phases       `yaml:"phases"`
@@ -109,6 +113,10 @@ func (c *Config) validate() error {
 		}
 	}
 
+	if err := c.validateAdditionalDirs(); err != nil {
+		return err
+	}
+
 	if c.SpecsDir != "" {
 		clean := filepath.Clean(c.SpecsDir)
 		if filepath.IsAbs(clean) || clean == "." || clean == ".." ||
@@ -117,6 +125,26 @@ func (c *Config) validate() error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Config) validateAdditionalDirs() error {
+	seen := make(map[string]bool, len(c.AdditionalDirs))
+	basenames := make(map[string]bool, len(c.AdditionalDirs))
+	for _, dir := range c.AdditionalDirs {
+		if !filepath.IsAbs(dir) {
+			return fmt.Errorf("additional_directories: path must be absolute, got %q", dir)
+		}
+		if seen[dir] {
+			return fmt.Errorf("additional_directories: duplicate path %q", dir)
+		}
+		seen[dir] = true
+		base := filepath.Base(dir)
+		if basenames[base] {
+			return fmt.Errorf("%w: additional_directories contain multiple paths with basename %q", ErrDuplicateBasename, base)
+		}
+		basenames[base] = true
+	}
 	return nil
 }
 

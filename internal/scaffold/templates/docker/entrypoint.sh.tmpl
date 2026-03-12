@@ -20,6 +20,18 @@ runuser -u claude -- git config --global user.email "noreply@anthropic.com"
 runuser -u claude -- git config --global commit.gpgsign false
 runuser -u claude -- git config --global --add safe.directory /workspace/repo
 
+# Mark additional repo directories as safe for git operations.
+if [ -n "${ADDITIONAL_DIRS:-}" ]; then
+    IFS=',' read -ra ADIRS <<< "$ADDITIONAL_DIRS"
+    for adir in "${ADIRS[@]}"; do
+        runuser -u claude -- git config --global --add safe.directory "$adir"
+    done
+fi
+
+# ─── Rewrite SSH remotes to HTTPS (firewall only allows HTTPS) ────
+# Uses insteadOf so bind-mounted repos keep their SSH remotes on the host.
+runuser -u claude -- git config --global url."https://github.com/".insteadOf "git@github.com:"
+
 # ─── Git credentials (avoid embedding token in URLs) ─────────────
 runuser -u claude -- git config --global credential.helper store
 runuser -u claude -- bash -c "printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n' \

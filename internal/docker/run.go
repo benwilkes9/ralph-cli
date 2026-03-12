@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -20,6 +21,7 @@ type RunOptions struct {
 	DepsDir        string     // relative path for dep volume overlay (e.g. "node_modules"), empty = none
 	ProjectName    string     // for volume naming
 	Auth           AuthMethod // which credential to pass into the container
+	AdditionalDirs []string   // host paths to additional repos
 }
 
 // Run executes docker run with the given options, attaching stdin/stdout/stderr.
@@ -51,6 +53,17 @@ func runWithRunner(runner CommandRunner, opts *RunOptions) error {
 			"-v", depsVolume(opts.ProjectName)+":/workspace/repo/"+opts.DepsDir,
 			"-e", "DEPS_DIR="+opts.DepsDir,
 		)
+	}
+
+	for _, dir := range opts.AdditionalDirs {
+		args = append(args, "-v", bindMount(dir, "/workspace/"+filepath.Base(dir)))
+	}
+	if len(opts.AdditionalDirs) > 0 {
+		cPaths := make([]string, 0, len(opts.AdditionalDirs))
+		for _, dir := range opts.AdditionalDirs {
+			cPaths = append(cPaths, "/workspace/"+filepath.Base(dir))
+		}
+		args = append(args, "-e", "ADDITIONAL_DIRS="+strings.Join(cPaths, ","))
 	}
 
 	// If a cross-compiled Linux binary exists alongside the host binary,

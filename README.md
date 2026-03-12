@@ -102,6 +102,7 @@ Flags can be combined: `ralph plan -n 3 --specs specs/custom-dir`
 - Phase-specific settings (prompt files, max iterations)
 - Network allowlist (extra domains the container can reach)
 - Dependency directory for volume caching (e.g. `node_modules`, `.venv`)
+- Additional directories for [multi-repo support](#multi-repo-support)
 
 ```yaml
 # Auto-populated by ralph init based on detected ecosystem.
@@ -114,6 +115,11 @@ network:
 # Cache dependency directory in a named Docker volume to survive rebuilds
 docker:
   deps_dir: .venv
+
+# Multi-repo support — coordinate changes across multiple repositories
+additional_directories:
+  - /Users/you/code/repo-b
+  - /Users/you/code/repo-c
 ```
 
 ## Branch Isolation
@@ -123,6 +129,30 @@ Ralph is branch-aware — plans and specs are isolated per branch so parallel fe
 - **All commands** (`init`, `plan`, `build`) **must be run on a feature branch** — they'll error on `main` or `master`
 - **Specs directory** is chosen during `ralph init`. Preset options (e.g. `specs/`) have the branch appended automatically (e.g. `specs/my-feature/`). Custom paths are used as-is. Overridable per-run with `--specs`
 - **Plans** are stored at `.ralph/plans/IMPLEMENTATION_PLAN_{branch}.md` (e.g. `IMPLEMENTATION_PLAN_my-feature.md`)
+
+## Multi-Repo Support
+
+Ralph can orchestrate changes across multiple repositories in a single loop. This is useful for coordinated changes across microservices, split frontend/backend repos, etc.
+
+Add `additional_directories` to your `.ralph/config.yaml` with absolute paths to each additional repo:
+
+```yaml
+additional_directories:
+  - /Users/you/code/api-service
+  - /Users/you/code/shared-lib
+```
+
+**Requirements:**
+- All paths must be absolute
+- Each path must be a git repository
+- All repos (primary + additional) must be on the **same branch** — Ralph errors during preflight if any repo is on the wrong branch
+- No two directories can share the same basename (they're mounted at `/workspace/{basename}`)
+
+**How it works:**
+- Each additional repo is bind-mounted into the container alongside the primary repo
+- Claude Code receives `--add-dir` flags so it can read and write across all repos
+- Stale detection tracks HEAD across all repos — any repo changing resets the stale counter
+- After each iteration, Ralph pushes all repos that have new commits
 
 ## Container Isolation
 
@@ -162,7 +192,7 @@ If the agent corrupts workspace files, use `git checkout` or `git stash` to reco
 ## Important Practices
 
 ### Specs
-You can implement a full feature in one shot in a single code repo (a monolith, a monorepo, a microservice, whatever — but a single repo). For this to work **you must provide well-written, clear, unambiguous specs**. Think context engineering, spec-driven development — the results you get will depend on the context you give it.
+You can implement a full feature in one shot — in a single repo or across [multiple repos](#multi-repo-support). For this to work **you must provide well-written, clear, unambiguous specs**. Think context engineering, spec-driven development — the results you get will depend on the context you give it.
 
 ### Prompts
 `ralph init` generates two prompt files: `.ralph/prompts/plan.md` and `.ralph/prompts/build.md`. These are the instructions that get fed to Claude on every iteration of the plan and build loops respectively. They're yours to customise — tweak them to suit your project, your conventions, your workflow. The defaults are just a solid starting point. Again, this is crucial context.
@@ -207,6 +237,23 @@ make build    # Build to bin/ralph
 make test     # Run tests
 make lint     # Run linter
 make install  # Install to $GOPATH/bin
+```
+
+### Testing Local Changes in Docker
+
+Ralph's Docker container installs the published `ralph@latest` from the Go module proxy. To test unpublished changes inside the container, cross-compile a Linux binary and place it next to your host binary — `findLinuxBinary()` will automatically mount it into the container:
+
+```bash
+# Build and install host binary + cross-compile for container
+make install && GOOS=linux GOARCH=arm64 go build -o "$(go env GOPATH)/bin/ralph-linux" ./cmd/ralph/
+```
+
+> Use `GOARCH=amd64` if your Docker VM runs x86_64 (check with `docker info --format '{{.Architecture}}'`).
+
+If you also need a fresh Claude CLI (e.g. testing new flags), rebuild the Docker image without cache from the target repo:
+
+```bash
+docker build --no-cache -t ralph-loop:latest -f .ralph/docker/Dockerfile .
 ```
 
 ## License

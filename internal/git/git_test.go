@@ -1,9 +1,12 @@
 package git
 
 import (
+	"context"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSanitizeBranch(t *testing.T) {
@@ -59,4 +62,43 @@ func TestIsProtectedBranch(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// initRepo creates a git repo with an initial commit in a temp dir.
+func initRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "--initial-branch=main"},
+		{"config", "user.name", "test"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "commit.gpgsign", "false"},
+		{"commit", "--allow-empty", "-m", "init"},
+	} {
+		cmd := exec.CommandContext(context.Background(), "git", args...) //nolint:gosec // test helper
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, out)
+	}
+	return dir
+}
+
+func TestIsGitRepo(t *testing.T) {
+	dir := initRepo(t)
+	assert.True(t, IsGitRepo(dir))
+	assert.False(t, IsGitRepo(t.TempDir()))
+}
+
+func TestHeadIn(t *testing.T) {
+	dir := initRepo(t)
+	head, err := HeadIn(dir)
+	require.NoError(t, err)
+	assert.Len(t, head, 40, "expected full SHA")
+}
+
+func TestBranchIn(t *testing.T) {
+	dir := initRepo(t)
+	branch, err := BranchIn(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "main", branch)
 }
