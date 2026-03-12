@@ -126,7 +126,7 @@ func run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme, gitCl
 			}
 
 			// Push additional repos that changed.
-			pushAdditionalDirs(gitCl, opts, headBefore, headAfter, w, theme)
+			pushAdditionalDirs(gitCl, opts, w, theme)
 		}
 	}
 
@@ -195,8 +195,8 @@ func compositeHead(gitCl GitClient, additionalDirs []string) (string, error) {
 	return head, nil
 }
 
-// pushAdditionalDirs pushes any additional repos whose HEAD changed during the iteration.
-func pushAdditionalDirs(gitCl GitClient, opts *Options, _, _ string, w io.Writer, theme *ui.Theme) {
+// pushAdditionalDirs pushes all additional repos after an iteration where changes were detected.
+func pushAdditionalDirs(gitCl GitClient, opts *Options, w io.Writer, theme *ui.Theme) {
 	for _, dir := range opts.AdditionalDirs {
 		if pushErr := gitCl.PushIn(dir, opts.Branch); pushErr != nil {
 			fmt.Fprintf(w, "%s\n", theme.Muted.Render(fmt.Sprintf("Push failed for %s, trying --set-upstream...", dir))) //nolint:errcheck // display-only

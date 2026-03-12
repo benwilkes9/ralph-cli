@@ -309,8 +309,28 @@ func TestLoad_AdditionalDirsValidation(t *testing.T) {
 		},
 		{
 			name:    "basename collision rejected",
-			dirs:    "  - /home/user/one/repo\n  - /home/user/two/repo",
+			dirs:    "  - /home/user/one/lib\n  - /home/user/two/lib",
 			wantErr: "duplicate basename",
+		},
+		{
+			name:    "path traversal via .. basename",
+			dirs:    "  - /foo/bar/..",
+			wantErr: "basename",
+		},
+		{
+			name:    "path traversal via . basename",
+			dirs:    "  - /foo/.",
+			wantErr: "basename",
+		},
+		{
+			name:    "reserved basename repo",
+			dirs:    "  - /home/user/repo",
+			wantErr: "reserved",
+		},
+		{
+			name:    "comma in path rejected",
+			dirs:    "  - /home/user/dir,name",
+			wantErr: "commas",
 		},
 		{
 			name: "empty list valid",

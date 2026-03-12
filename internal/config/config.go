@@ -135,11 +135,27 @@ func (c *Config) validateAdditionalDirs() error {
 		if !filepath.IsAbs(dir) {
 			return fmt.Errorf("additional_directories: path must be absolute, got %q", dir)
 		}
-		if seen[dir] {
+
+		clean := filepath.Clean(dir)
+
+		rawBase := filepath.Base(dir)
+		if rawBase == "." || rawBase == ".." {
+			return fmt.Errorf("additional_directories: invalid basename %q in path %q", rawBase, dir)
+		}
+
+		if strings.Contains(clean, ",") {
+			return fmt.Errorf("additional_directories: path must not contain commas, got %q", dir)
+		}
+
+		if seen[clean] {
 			return fmt.Errorf("additional_directories: duplicate path %q", dir)
 		}
-		seen[dir] = true
-		base := filepath.Base(dir)
+		seen[clean] = true
+
+		base := filepath.Base(clean)
+		if base == "repo" {
+			return fmt.Errorf("additional_directories: basename %q is reserved (primary mount point)", base)
+		}
 		if basenames[base] {
 			return fmt.Errorf("%w: additional_directories contain multiple paths with basename %q", ErrDuplicateBasename, base)
 		}

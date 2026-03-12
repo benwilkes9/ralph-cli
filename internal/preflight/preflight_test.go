@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/benwilkes9/ralph-cli/internal/git"
 	"github.com/benwilkes9/ralph-cli/internal/testutil"
 )
 
@@ -272,6 +273,21 @@ func TestCheckAdditionalDirs_WrongBranch(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, `on branch "main"`)
 	assert.ErrorContains(t, err, `expected "feature"`)
+}
+
+func TestCheckAdditionalDirs_AutoPush(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+
+	// Create a new branch that doesn't exist on the remote.
+	testutil.RunGit(t, clone, "checkout", "-b", "feature-new")
+
+	err := CheckAdditionalDirs("feature-new", []string{clone})
+	require.NoError(t, err)
+
+	// Verify the branch now exists on the remote.
+	exists, err := git.BranchExistsOnRemoteIn(clone, "feature-new")
+	require.NoError(t, err)
+	assert.True(t, exists, "expected branch to be auto-pushed to remote")
 }
 
 func TestCheckAdditionalDirs_HappyPath(t *testing.T) {
