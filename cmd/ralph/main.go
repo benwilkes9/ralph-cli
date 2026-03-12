@@ -188,6 +188,7 @@ func planCmd(orch Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan",
 		Short: "Run planning loop (generates branch-specific plan)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			theme := ui.DefaultTheme()
 			w := cmd.OutOrStdout()
@@ -243,6 +244,7 @@ func buildCmd(orch Orchestrator) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build",
 		Short: "Run build loop (implements tasks one at a time)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			theme := ui.DefaultTheme()
 			w := cmd.OutOrStdout()
@@ -394,6 +396,10 @@ func runLoop(mode loop.Mode, maxFlag int) error {
 		StateFile:     state.DefaultPath,
 		PlanFile:      planFile,
 		SpecsDir:      specsDir,
+	}
+
+	if envDirs := os.Getenv("ADDITIONAL_DIRS"); envDirs != "" {
+		opts.AdditionalDirs = strings.Split(envDirs, ",")
 	}
 
 	loopErr := loop.Run(ctx, opts, os.Stdout, ui.DefaultTheme())

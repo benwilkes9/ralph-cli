@@ -25,6 +25,10 @@ type fakeGit struct {
 	headIdx        int
 	pushErr        error
 	upstreamCalled bool
+	// Additional dirs support.
+	additionalHeads map[string][]string // dir → sequence of HEADs
+	additionalIdx   map[string]int
+	pushedDirs      []string
 }
 
 func (f *fakeGit) Head() (string, error) {
@@ -39,6 +43,30 @@ func (f *fakeGit) Head() (string, error) {
 func (f *fakeGit) Push(_ string) error { return f.pushErr }
 
 func (f *fakeGit) PushSetUpstream(_ string) error {
+	f.upstreamCalled = true
+	return nil
+}
+
+func (f *fakeGit) HeadIn(dir string) (string, error) {
+	heads, ok := f.additionalHeads[dir]
+	if !ok || len(heads) == 0 {
+		return "0000000000000000000000000000000000000000", nil
+	}
+	if f.additionalIdx == nil {
+		f.additionalIdx = make(map[string]int)
+	}
+	idx := f.additionalIdx[dir] % len(heads)
+	f.additionalIdx[dir]++
+	return heads[idx], nil
+}
+
+func (f *fakeGit) PushIn(dir, _ string) error {
+	f.pushedDirs = append(f.pushedDirs, dir)
+	return f.pushErr
+}
+
+func (f *fakeGit) PushSetUpstreamIn(dir, _ string) error {
+	f.pushedDirs = append(f.pushedDirs, dir)
 	f.upstreamCalled = true
 	return nil
 }
@@ -179,11 +207,90 @@ func TestRun_PushFallback(t *testing.T) {
 }
 
 func TestClaudeArgs(t *testing.T) {
-	args := claudeArgs()
+	args := claudeArgs(nil)
 	assert.Contains(t, args, "-p")
 	assert.Contains(t, args, "--dangerously-skip-permissions")
 	assert.Contains(t, args, "--output-format=stream-json")
 	assert.Contains(t, args, "--model")
+}
+
+func TestClaudeArgs_WithAdditionalDirs(t *testing.T) {
+	args := claudeArgs([]string{"/workspace/repo-a", "/workspace/repo-b"})
+	assert.Contains(t, args, "--add-dir")
+
+	// Verify both dirs appear after --add-dir flags.
+	count := 0
+	for i, a := range args {
+		if a == "--add-dir" {
+			count++
+			require.Less(t, i+1, len(args))
+		}
+	}
+	assert.Equal(t, 2, count)
+}
+
+func TestRun_AdditionalDir_ChangeResetsStale(t *testing.T) {
+	opts := baseOpts(t)
+	opts.MaxIterations = 3
+	opts.AdditionalDirs = []string{"/workspace/repo-b"}
+
+	// Primary repo HEAD never changes, but additional repo does.
+	g := &fakeGit{
+		heads: []string{"same-sha"},
+		additionalHeads: map[string][]string{
+			"/workspace/repo-b": {"sha-x", "sha-x", "sha-x", "sha-y", "sha-y", "sha-y", "sha-z", "sha-z"},
+		},
+	}
+	c := &fakeClaude{stats: iterStats()}
+
+	var buf bytes.Buffer
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
+	require.NoError(t, err)
+
+	// Should run all 3 iterations (not stale-abort) because the additional repo changes.
+	assert.Equal(t, 3, c.called)
+}
+
+func TestRun_AdditionalDir_AllUnchangedIsStale(t *testing.T) {
+	opts := baseOpts(t)
+	opts.MaxIterations = 10
+	opts.AdditionalDirs = []string{"/workspace/repo-b"}
+
+	// Both repos never change → stale.
+	g := &fakeGit{
+		heads: []string{"same-sha"},
+		additionalHeads: map[string][]string{
+			"/workspace/repo-b": {"same-sha-b"},
+		},
+	}
+	c := &fakeClaude{stats: iterStats()}
+
+	var buf bytes.Buffer
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
+	require.NoError(t, err)
+
+	assert.Equal(t, DefaultMaxStale, c.called)
+}
+
+func TestRun_AdditionalDir_PushedOnChange(t *testing.T) {
+	opts := baseOpts(t)
+	opts.MaxIterations = 1
+	opts.AdditionalDirs = []string{"/workspace/repo-b"}
+
+	// Both repos change.
+	g := &fakeGit{
+		heads: []string{"sha-a", "sha-b"},
+		additionalHeads: map[string][]string{
+			"/workspace/repo-b": {"sha-x", "sha-x", "sha-y"},
+		},
+	}
+	c := &fakeClaude{stats: iterStats()}
+
+	var buf bytes.Buffer
+	err := run(context.Background(), opts, &buf, runTheme, g, c)
+	require.NoError(t, err)
+
+	assert.Contains(t, g.pushedDirs, "/workspace/repo-b")
 }
 
 func TestSaveState_PersistsRecord(t *testing.T) {

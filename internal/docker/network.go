@@ -8,6 +8,7 @@ var DefaultAllowedDomains = []string{
 	"claude.ai",
 	"github.com",
 	"api.github.com",
+	"objects.githubusercontent.com",
 	"registry.npmjs.org",
 }
 

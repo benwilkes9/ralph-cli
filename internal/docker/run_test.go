@@ -73,7 +73,7 @@ func TestRunWithRunner_AllowedDomainsEnvVar(t *testing.T) {
 	require.NoError(t, runWithRunner(r, baseRunOpts()))
 
 	call := r.calls[0]
-	assert.Contains(t, call, "ALLOWED_DOMAINS=api.anthropic.com,claude.ai,github.com,api.github.com,registry.npmjs.org")
+	assert.Contains(t, call, "ALLOWED_DOMAINS=api.anthropic.com,claude.ai,github.com,api.github.com,objects.githubusercontent.com,registry.npmjs.org")
 }
 
 func TestRunWithRunner_NoRepoEnvVar(t *testing.T) {
@@ -154,6 +154,39 @@ func TestRunWithRunner_ImageTag(t *testing.T) {
 	require.NoError(t, runWithRunner(r, opts))
 
 	assert.Contains(t, r.calls[0], "custom-image:v2")
+}
+
+func TestRunWithRunner_AdditionalDirs_Mounts(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.AdditionalDirs = []string{"/home/user/repo-a", "/home/user/repo-b"}
+	require.NoError(t, runWithRunner(r, opts))
+
+	call := r.calls[0]
+	assert.Contains(t, call, "/home/user/repo-a:/workspace/repo-a")
+	assert.Contains(t, call, "/home/user/repo-b:/workspace/repo-b")
+}
+
+func TestRunWithRunner_AdditionalDirs_EnvVar(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.AdditionalDirs = []string{"/home/user/repo-a", "/home/user/repo-b"}
+	require.NoError(t, runWithRunner(r, opts))
+
+	call := r.calls[0]
+	assert.Contains(t, call, "ADDITIONAL_DIRS=/workspace/repo-a,/workspace/repo-b")
+}
+
+func TestRunWithRunner_AdditionalDirs_Empty(t *testing.T) {
+	r := &fakeRunner{}
+	opts := baseRunOpts()
+	opts.AdditionalDirs = nil
+	require.NoError(t, runWithRunner(r, opts))
+
+	call := r.calls[0]
+	for _, arg := range call {
+		assert.NotContains(t, arg, "ADDITIONAL_DIRS=")
+	}
 }
 
 func TestRunWithRunner_WrapsError(t *testing.T) {

@@ -9,6 +9,45 @@ import (
 	"github.com/benwilkes9/ralph-cli/internal/scaffold"
 )
 
+// CheckAdditionalDirs validates that each additional directory exists, is a git
+// repo, and is on the expected branch. If a repo's branch is not pushed to the
+// remote, it will be pushed automatically.
+func CheckAdditionalDirs(branch string, dirs []string) error {
+	for _, dir := range dirs {
+		base := filepath.Base(dir)
+
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			return fmt.Errorf("preflight: additional directory %q does not exist", dir)
+		} else if err != nil {
+			return fmt.Errorf("preflight: checking additional directory %q: %w", dir, err)
+		}
+
+		if !git.IsGitRepo(dir) {
+			return fmt.Errorf("preflight: %q is not a git repository", dir)
+		}
+
+		dirBranch, err := git.BranchIn(dir)
+		if err != nil {
+			return fmt.Errorf("preflight: getting branch for %q: %w", base, err)
+		}
+		if dirBranch != branch {
+			return fmt.Errorf("preflight: repo %q is on branch %q, expected %q", base, dirBranch, branch)
+		}
+
+		exists, err := git.BranchExistsOnRemoteIn(dir, branch)
+		if err != nil {
+			return fmt.Errorf("preflight: checking remote branch for %q: %w", base, err)
+		}
+		if !exists {
+			fmt.Printf("Pushing branch %q to origin for %s...\n", branch, base)
+			if err := git.PushSetUpstreamIn(dir, branch); err != nil {
+				return fmt.Errorf("preflight: git push -u origin %s in %q: %w", branch, base, err)
+			}
+		}
+	}
+	return nil
+}
+
 // Check runs pre-flight validation before launching Docker. It verifies that
 // .ralph/ scaffold files exist on disk, auto-commits them if needed, ensures
 // the specs and plans directories are tracked, and pushes the branch to the remote.

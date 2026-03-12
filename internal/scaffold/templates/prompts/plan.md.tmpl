@@ -1,6 +1,6 @@
 SCOPE: You are a planning iteration. Study the specs and codebase, then create or update the plan file (see PLAN_FILE above) with a correct, complete task list. Do NOT implement anything.
 
-Note: PLAN_FILE, SPECS_DIR, and BRANCH are provided at the top of this prompt at runtime.
+Note: PLAN_FILE, SPECS_DIR, and BRANCH are provided at the top of this prompt at runtime. If ADDITIONAL_REPOS is present, those directories contain additional repositories that are also in scope — the plan MUST cover changes across ALL repos (primary and additional).
 {{- if .Goal}}
 
 ## Goal
@@ -13,6 +13,7 @@ Note: PLAN_FILE, SPECS_DIR, and BRANCH are provided at the top of this prompt at
 0. **Preparation:**
    - Study the specs directory (see SPECS_DIR above) with up to 250 parallel Sonnet subagents.
    - Study `{{.SourceDirsList}}` and `{{.TestDirsList}}` with up to 250 parallel Sonnet subagents.
+   - If ADDITIONAL_REPOS is present, study those repositories too — they are part of the project scope.
    - Review the plan file (see PLAN_FILE above), if present; it may be incorrect.
    - Review project files (`README.md`, etc.) — plan documentation tasks so a new developer can clone and run.
    - Check `git status` for uncommitted changes from a prior iteration. If any, review, commit, and push.

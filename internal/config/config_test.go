@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const minimalConfig = "project: test\n"
+
 func TestLoad_Valid(t *testing.T) {
 	dir := t.TempDir()
 	writeConfig(t, dir, `
@@ -29,7 +31,7 @@ phases:
 
 func TestLoad_DefaultValues(t *testing.T) {
 	dir := t.TempDir()
-	writeConfig(t, dir, "project: test\n")
+	writeConfig(t, dir, minimalConfig)
 
 	cfg, err := Load(dir)
 	require.NoError(t, err)
@@ -136,7 +138,7 @@ func TestLoad_DepsDirTraversal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.depsDir, func(t *testing.T) {
 			dir := t.TempDir()
-			yaml := "project: test\n"
+			yaml := minimalConfig
 			if tt.depsDir != "" {
 				yaml += "docker:\n  deps_dir: " + tt.depsDir + "\n"
 			}
@@ -258,7 +260,7 @@ func TestLoad_SpecsDirTraversal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.specsDir, func(t *testing.T) {
 			dir := t.TempDir()
-			yaml := "project: test\n"
+			yaml := minimalConfig
 			if tt.specsDir != "" {
 				yaml += "specs_dir: " + tt.specsDir + "\n"
 			}
@@ -268,6 +270,86 @@ func TestLoad_SpecsDirTraversal(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "specs_dir must be a relative path")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestLoad_AdditionalDirs(t *testing.T) {
+	dir := t.TempDir()
+	writeConfig(t, dir, `
+project: test
+additional_directories:
+  - /home/user/repo-a
+  - /home/user/repo-b
+`)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/home/user/repo-a", "/home/user/repo-b"}, cfg.AdditionalDirs)
+}
+
+func TestLoad_AdditionalDirsValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		dirs    string
+		wantErr string
+	}{
+		{
+			name:    "relative path rejected",
+			dirs:    "  - relative/path",
+			wantErr: "path must be absolute",
+		},
+		{
+			name:    "duplicate path rejected",
+			dirs:    "  - /home/user/repo-a\n  - /home/user/repo-a",
+			wantErr: "duplicate path",
+		},
+		{
+			name:    "basename collision rejected",
+			dirs:    "  - /home/user/one/lib\n  - /home/user/two/lib",
+			wantErr: "duplicate basename",
+		},
+		{
+			name:    "path traversal via .. basename",
+			dirs:    "  - /foo/bar/..",
+			wantErr: "basename",
+		},
+		{
+			name:    "path traversal via . basename",
+			dirs:    "  - /foo/.",
+			wantErr: "basename",
+		},
+		{
+			name:    "reserved basename repo",
+			dirs:    "  - /home/user/repo",
+			wantErr: "reserved",
+		},
+		{
+			name:    "comma in path rejected",
+			dirs:    "  - /home/user/dir,name",
+			wantErr: "commas",
+		},
+		{
+			name: "empty list valid",
+			dirs: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			yaml := minimalConfig
+			if tt.dirs != "" {
+				yaml += "additional_directories:\n" + tt.dirs + "\n"
+			}
+			writeConfig(t, dir, yaml)
+
+			_, err := Load(dir)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
 			}

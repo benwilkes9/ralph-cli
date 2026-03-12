@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/benwilkes9/ralph-cli/internal/git"
 	"github.com/benwilkes9/ralph-cli/internal/testutil"
 )
 
@@ -245,6 +246,54 @@ func TestCheck_AutoCommitsModifiedGitignore(t *testing.T) {
 	// Verify .gitignore was included in the scaffold commit.
 	show := gitShow(t, clone, "HEAD", "--name-only")
 	assert.Contains(t, show, ".gitignore")
+}
+
+func TestCheckAdditionalDirs_EmptyList(t *testing.T) {
+	err := CheckAdditionalDirs("main", nil)
+	require.NoError(t, err)
+}
+
+func TestCheckAdditionalDirs_DirMissing(t *testing.T) {
+	err := CheckAdditionalDirs("main", []string{"/nonexistent/path"})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "does not exist")
+}
+
+func TestCheckAdditionalDirs_NotARepo(t *testing.T) {
+	dir := t.TempDir()
+	err := CheckAdditionalDirs("main", []string{dir})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "not a git repository")
+}
+
+func TestCheckAdditionalDirs_WrongBranch(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	// clone is on "main", but we expect "feature"
+	err := CheckAdditionalDirs("feature", []string{clone})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `on branch "main"`)
+	assert.ErrorContains(t, err, `expected "feature"`)
+}
+
+func TestCheckAdditionalDirs_AutoPush(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+
+	// Create a new branch that doesn't exist on the remote.
+	testutil.RunGit(t, clone, "checkout", "-b", "feature-new")
+
+	err := CheckAdditionalDirs("feature-new", []string{clone})
+	require.NoError(t, err)
+
+	// Verify the branch now exists on the remote.
+	exists, err := git.BranchExistsOnRemoteIn(clone, "feature-new")
+	require.NoError(t, err)
+	assert.True(t, exists, "expected branch to be auto-pushed to remote")
+}
+
+func TestCheckAdditionalDirs_HappyPath(t *testing.T) {
+	_, clone := testutil.InitBareAndClone(t)
+	err := CheckAdditionalDirs("main", []string{clone})
+	require.NoError(t, err)
 }
 
 func TestCheck_AllClean(t *testing.T) {

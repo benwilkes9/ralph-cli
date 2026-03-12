@@ -86,26 +86,37 @@ func BuildAndRun(w io.Writer, theme *ui.Theme, mode string, maxIterations int, b
 		return err //nolint:wrapcheck // preflight errors already have context
 	}
 
-	if err := Build(DefaultDockerfile, DefaultTag, DefaultContext); err != nil {
-		return err
-	}
-
-	repoRoot, err := filepath.Abs(".")
+	// Load config early to access AdditionalDirs for preflight validation.
+	repoRootForCfg, err := filepath.Abs(".")
 	if err != nil {
-		return fmt.Errorf("resolving project dir: %w", err)
+		return fmt.Errorf("resolving project dir for config: %w", err)
 	}
-
-	cfg, err := config.Load(repoRoot)
+	cfgEarly, err := config.Load(repoRootForCfg)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	if len(cfgEarly.AdditionalDirs) > 0 {
+		if err := preflight.CheckAdditionalDirs(branch, cfgEarly.AdditionalDirs); err != nil {
+			return err //nolint:wrapcheck // preflight errors already have context
+		}
+	}
+
+	if err := Build(DefaultDockerfile, DefaultTag, DefaultContext); err != nil {
+		return err
+	}
+
+	cfg := cfgEarly
+	repoRoot := repoRootForCfg
 	allowedDomains := AllowedDomains(cfg.Network.ExtraAllowedDomains)
 
 	fmt.Fprintf(w, "%s %s  %s %s\n", //nolint:errcheck // display-only
 		theme.Muted.Render("Repo:"), repo,
 		theme.Muted.Render("Branch:"), theme.Info.Render(branch))
 	fmt.Fprintf(w, "%s %s → /workspace/repo\n", theme.Muted.Render("Mount:"), repoRoot) //nolint:errcheck // display-only
+	for _, dir := range cfg.AdditionalDirs {
+		fmt.Fprintf(w, "%s %s → /workspace/%s\n", theme.Muted.Render("Mount:"), dir, filepath.Base(dir)) //nolint:errcheck // display-only
+	}
 	if cfg.Docker.DepsDir != "" {
 		fmt.Fprintf(w, "%s ralph-deps-%s → %s\n", //nolint:errcheck // display-only
 			theme.Muted.Render("Deps volume:"), cfg.Project, cfg.Docker.DepsDir)
@@ -126,6 +137,7 @@ func BuildAndRun(w io.Writer, theme *ui.Theme, mode string, maxIterations int, b
 		DepsDir:        cfg.Docker.DepsDir,
 		ProjectName:    cfg.Project,
 		Auth:           auth,
+		AdditionalDirs: cfg.AdditionalDirs,
 	}
 
 	return Run(runOpts)

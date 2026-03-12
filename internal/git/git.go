@@ -147,6 +147,68 @@ func IsProtectedBranch(branch string, protected []string) bool {
 	return false
 }
 
+// IsGitRepo returns true if dir is a git repository.
+func IsGitRepo(dir string) bool {
+	_, err := runIn(dir, "rev-parse", "--git-dir")
+	return err == nil
+}
+
+// HeadIn returns the HEAD commit hash for the repo at dir.
+func HeadIn(dir string) (string, error) {
+	out, err := runIn(dir, "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// BranchIn returns the current branch name for the repo at dir.
+func BranchIn(dir string) (string, error) {
+	out, err := runIn(dir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// PushIn pushes the given branch to origin for the repo at dir.
+func PushIn(dir, branch string) error {
+	_, err := runIn(dir, "push", "origin", branch)
+	return err
+}
+
+// PushSetUpstreamIn pushes and sets upstream for the repo at dir.
+func PushSetUpstreamIn(dir, branch string) error {
+	_, err := runIn(dir, "push", "-u", "origin", branch)
+	return err
+}
+
+// BranchExistsOnRemoteIn returns true if the branch exists on origin for the repo at dir.
+func BranchExistsOnRemoteIn(dir, branch string) (bool, error) {
+	out, err := runIn(dir, "ls-remote", "--heads", "origin", "refs/heads/"+branch)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}
+
+func runIn(dir string, args ...string) (string, error) {
+	if len(args) == 0 {
+		return "", fmt.Errorf("git: no subcommand specified")
+	}
+	full := append([]string{"-C", dir}, args...)                     //nolint:gocritic // building new slice intentionally
+	cmd := exec.CommandContext(context.Background(), "git", full...) //nolint:gosec // args are hardcoded by callers in this package
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("git %s: %w\n%s", args[0], err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return "", fmt.Errorf("git %s: %w", args[0], err)
+	}
+	return string(out), nil
+}
+
 func run(args ...string) (string, error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("git: no subcommand specified")

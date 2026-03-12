@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	logfile "github.com/benwilkes9/ralph-cli/internal/log"
@@ -27,15 +28,16 @@ const (
 
 // Options configures a loop run.
 type Options struct {
-	Mode          Mode
-	PromptFile    string
-	MaxIterations int
-	FreshContext  bool
-	LogsDir       string
-	Branch        string
-	StateFile     string
-	PlanFile      string
-	SpecsDir      string
+	Mode           Mode
+	PromptFile     string
+	MaxIterations  int
+	FreshContext   bool
+	LogsDir        string
+	Branch         string
+	StateFile      string
+	PlanFile       string
+	SpecsDir       string
+	AdditionalDirs []string // container paths to additional repos
 }
 
 // Run executes the main iteration loop.
@@ -46,13 +48,13 @@ func Run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme) error
 func run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme, gitCl GitClient, claudeCl ClaudeRunner) error {
 	RenderHeader(w, opts, theme)
 
-	// Seed stale detector with initial HEAD.
-	head, err := gitCl.Head()
+	// Seed stale detector with initial composite HEAD.
+	initHead, err := compositeHead(gitCl, opts.AdditionalDirs)
 	if err != nil {
 		return fmt.Errorf("getting initial HEAD: %w", err)
 	}
 	stale := NewStaleDetector(DefaultMaxStale)
-	stale.Check(head) // seed
+	stale.Check(initHead) // seed
 
 	cumStats := &stream.CumulativeStats{}
 	startTime := time.Now()
@@ -73,7 +75,7 @@ func run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme, gitCl
 			break
 		}
 
-		headBefore, err := gitCl.Head()
+		headBefore, err := compositeHead(gitCl, opts.AdditionalDirs)
 		if err != nil {
 			return fmt.Errorf("getting HEAD before iteration: %w", err)
 		}
@@ -99,7 +101,7 @@ func run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme, gitCl
 		}
 
 		// Check for stale iterations.
-		headAfter, err := gitCl.Head()
+		headAfter, err := compositeHead(gitCl, opts.AdditionalDirs)
 		if err != nil {
 			return fmt.Errorf("getting HEAD after iteration: %w", err)
 		}
@@ -115,13 +117,16 @@ func run(ctx context.Context, opts *Options, w io.Writer, theme *ui.Theme, gitCl
 		} else {
 			stale.Check(headAfter) // reset
 
-			// Push with fallback to --set-upstream.
+			// Push primary repo with fallback to --set-upstream.
 			if pushErr := gitCl.Push(opts.Branch); pushErr != nil {
 				RenderPushFallback(w, theme)
 				if upErr := gitCl.PushSetUpstream(opts.Branch); upErr != nil {
 					fmt.Fprintf(w, "%s\n", theme.Muted.Render(fmt.Sprintf("Push failed: %s", upErr))) //nolint:errcheck // display-only
 				}
 			}
+
+			// Push additional repos that changed.
+			pushAdditionalDirs(gitCl, opts, w, theme)
 		}
 	}
 
@@ -173,22 +178,58 @@ func saveState(opts *Options, cumStats *stream.CumulativeStats, startTime time.T
 	_ = state.Save(opts.StateFile, st) //nolint:errcheck // best-effort
 }
 
+// compositeHead concatenates the HEAD from the primary repo and all additional
+// dirs into a single string for stale detection. Any repo changing resets stale.
+func compositeHead(gitCl GitClient, additionalDirs []string) (string, error) {
+	head, err := gitCl.Head()
+	if err != nil {
+		return "", fmt.Errorf("primary HEAD: %w", err)
+	}
+	for _, dir := range additionalDirs {
+		h, err := gitCl.HeadIn(dir)
+		if err != nil {
+			return "", fmt.Errorf("HeadIn(%s): %w", dir, err)
+		}
+		head += ":" + h
+	}
+	return head, nil
+}
+
+// pushAdditionalDirs pushes all additional repos after an iteration where changes were detected.
+func pushAdditionalDirs(gitCl GitClient, opts *Options, w io.Writer, theme *ui.Theme) {
+	for _, dir := range opts.AdditionalDirs {
+		if pushErr := gitCl.PushIn(dir, opts.Branch); pushErr != nil {
+			fmt.Fprintf(w, "%s\n", theme.Muted.Render(fmt.Sprintf("Push failed for %s, trying --set-upstream...", dir))) //nolint:errcheck // display-only
+			if upErr := gitCl.PushSetUpstreamIn(dir, opts.Branch); upErr != nil {
+				fmt.Fprintf(w, "%s\n", theme.Muted.Render(fmt.Sprintf("Push failed for %s: %s", dir, upErr))) //nolint:errcheck // display-only
+			}
+		}
+	}
+}
+
 // claudeArgs builds the argument list for the claude CLI invocation.
-func claudeArgs() []string {
-	return []string{
+func claudeArgs(additionalDirs []string) []string {
+	args := make([]string, 0, 7+2*len(additionalDirs))
+	args = append(args,
 		"-p",
 		"--dangerously-skip-permissions",
 		"--output-format=stream-json",
 		"--model", "opus",
 		"--verbose",
+	)
+	for _, dir := range additionalDirs {
+		args = append(args, "--add-dir", dir)
 	}
+	return args
 }
 
 // runClaude invokes the claude CLI, tees output to the log writer, and returns iteration stats.
 func runClaude(ctx context.Context, opts *Options, logW, displayW io.Writer, theme *ui.Theme) (*stream.IterationStats, error) {
-	args := claudeArgs()
+	args := claudeArgs(opts.AdditionalDirs)
 
 	cmd := exec.CommandContext(ctx, "claude", args...) //nolint:gosec // args are static
+
+	cmd.Stderr = os.Stderr
 
 	promptContent, err := os.ReadFile(opts.PromptFile)
 	if err != nil {
@@ -200,6 +241,9 @@ func runClaude(ctx context.Context, opts *Options, logW, displayW io.Writer, the
 	fmt.Fprintf(&header, "PLAN_FILE: %s\n", opts.PlanFile)
 	fmt.Fprintf(&header, "SPECS_DIR: %s\n", opts.SpecsDir)
 	fmt.Fprintf(&header, "BRANCH: %s\n", opts.Branch)
+	if len(opts.AdditionalDirs) > 0 {
+		fmt.Fprintf(&header, "ADDITIONAL_REPOS: %s\n", strings.Join(opts.AdditionalDirs, ", "))
+	}
 	header.WriteString("---\n")
 
 	combined := bytes.Join([][]byte{header.Bytes(), promptContent}, nil)

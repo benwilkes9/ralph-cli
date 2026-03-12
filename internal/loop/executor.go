@@ -14,6 +14,9 @@ type GitClient interface {
 	Head() (string, error)
 	Push(branch string) error
 	PushSetUpstream(branch string) error
+	HeadIn(dir string) (string, error)
+	PushIn(dir, branch string) error
+	PushSetUpstreamIn(dir, branch string) error
 }
 
 // ClaudeRunner abstracts the claude CLI subprocess.
@@ -33,6 +36,18 @@ func (r *realGitClient) Push(branch string) error {
 
 func (r *realGitClient) PushSetUpstream(branch string) error {
 	return git.PushSetUpstream(branch) //nolint:wrapcheck // thin adapter
+}
+
+func (r *realGitClient) HeadIn(dir string) (string, error) {
+	return git.HeadIn(dir) //nolint:wrapcheck // thin adapter
+}
+
+func (r *realGitClient) PushIn(dir, branch string) error {
+	return git.PushIn(dir, branch) //nolint:wrapcheck // thin adapter
+}
+
+func (r *realGitClient) PushSetUpstreamIn(dir, branch string) error {
+	return git.PushSetUpstreamIn(dir, branch) //nolint:wrapcheck // thin adapter
 }
 
 type realClaudeRunner struct {
